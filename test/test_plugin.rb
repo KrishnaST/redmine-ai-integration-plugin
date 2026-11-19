@@ -205,6 +205,57 @@ class PluginTest < Minitest::Test
     end
   end
 
+  def test_unknown_inline_citations_are_rejected
+    draft = result
+    draft['fields'][1]['value'] += ' See [S99].'
+    assert_raises(RedmineAi::Error) do
+      RedmineAi::Policy.validate!(draft, RedmineAi::Policy.text_fields(@issue, @user), [])
+    end
+  end
+
+  def test_database_metadata_uses_read_only_transaction_and_always_disconnects
+    queries = []
+    closed = false
+    connection = Object.new
+    connection.define_singleton_method(:exec) { |sql| queries << sql }
+    connection.define_singleton_method(:close) { closed = true }
+    connection.define_singleton_method(:exec_params) do |sql, values|
+      queries << sql
+      raise 'Unexpected schema binding' unless values == ['payments']
+      if sql.include?('information_schema.columns')
+        Object.new.tap do |result|
+          result.define_singleton_method(:ntuples) { 1 }
+          result.define_singleton_method(:to_a) { [{'table_name' => 'transfer', 'column_name' => 'id', 'data_type' => 'bigint'}] }
+        end
+      else
+        []
+      end
+    end
+    pg = Object.new
+    pg.define_singleton_method(:connect) { |*_args, **_kwargs| connection }
+    Object.const_set(:PG, pg)
+    $LOADED_FEATURES << 'pg.rb'
+    ENV['REDMINE_AI_TEST_DB'] = 'test-only-url'
+    rows = RedmineAi::Sources.database({'url_env' => 'REDMINE_AI_TEST_DB', 'schema' => 'payments', 'name' => 'db'}, ['transfer'])
+    assert_equal 'BEGIN READ ONLY', queries.first
+    assert_equal 'ROLLBACK', queries.last
+    assert queries.any? { |sql| sql.include?('statement_timeout') }
+    assert closed
+    assert_equal 1, rows.size
+    assert_includes rows.first[:reference], 'payments.transfer'
+    closed = false
+    connection.define_singleton_method(:exec_params) { |*_args| raise IOError, 'sensitive DB failure' }
+    assert_raises(IOError) do
+      RedmineAi::Sources.database({'url_env' => 'REDMINE_AI_TEST_DB', 'schema' => 'payments', 'name' => 'db'}, ['transfer'])
+    end
+    assert closed
+    assert_equal 'ROLLBACK', queries.last
+  ensure
+    ENV.delete('REDMINE_AI_TEST_DB')
+    $LOADED_FEATURES.delete('pg.rb')
+    Object.send(:remove_const, :PG) if Object.const_defined?(:PG)
+  end
+
   def test_automatic_job_applies_and_interactive_job_only_drafts
     record = enhancement('automatic')
     record.update!(state: 'queued')

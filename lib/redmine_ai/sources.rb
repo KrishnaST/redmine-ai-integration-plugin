@@ -14,10 +14,11 @@ module RedmineAi
       terms = query.downcase.scan(/[a-z][a-z0-9_]{2,}/).uniq.first(80)
       candidates = []
       warnings = []
+      budget = {bytes: 10_000_000}
       Configuration.sources.each do |source|
         next unless source['project_ids'].include?(project_id)
         begin
-          snippets = source['type'] == 'files' ? files(source, terms) : database(source, terms)
+          snippets = source['type'] == 'files' ? files(source, terms, budget) : database(source, terms)
           candidates.concat(snippets)
         rescue StandardError
           # No paths, credentials, connection strings or database error messages in logs/UI.
@@ -34,12 +35,14 @@ module RedmineAi
       [selected.each_with_index.map { |snippet, index| snippet.merge('id' => "S#{index + 1}") }, warnings]
     end
 
-    def self.files(source, terms)
+    def self.files(source, terms, budget = {bytes: 10_000_000})
       root = Pathname.new(source.fetch('root')).realpath
       source.fetch('files').flat_map do |relative|
         next [] if relative.match?(BLOCKED) || !EXTENSIONS.include?(File.extname(relative).downcase)
         file = root.join(relative).realpath
         next [] unless file.to_s.start_with?(root.to_s + File::SEPARATOR) && file.file? && file.size <= MAX_BYTES
+        raise Error, 'File scan budget exceeded.' if file.size > budget[:bytes]
+        budget[:bytes] -= file.size
         bytes = file.binread
         next [] if bytes.include?("\x00")
         text = bytes.force_encoding('UTF-8').scrub
