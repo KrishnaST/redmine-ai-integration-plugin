@@ -1,4 +1,6 @@
 # frozen_string_literal: true
+require_relative '../../lib/redmine_ai/attachment_service'
+
 class AiEnhancement < ApplicationRecord
   belongs_to :issue
   belongs_to :user
@@ -22,6 +24,8 @@ class AiEnhancement < ApplicationRecord
         fields = RedmineAi::Policy.text_fields(issue, user)
         document = data
         result = RedmineAi::Policy.validate!(document.fetch('result'), fields, document.fetch('sources').map { |source| source['id'] })
+        attachments = result.fetch('attachments', [])
+        raise RedmineAi::Error, 'Attachments require interactive preview and Apply.' if mode != 'interactive' && attachments.any?
         attributes = {}
         custom = {}
         result['fields'].each do |field|
@@ -38,7 +42,10 @@ class AiEnhancement < ApplicationRecord
         citations.each { |source| notes << "\n[#{source['id']}] #{source['reference']} revision=#{source['revision']} sha256=#{source['sha256']}" }
         issue.init_journal(user, notes)
         issue.send(:safe_attributes=, attributes, user)
+        files = RedmineAi::AttachmentService.stage!(issue, user, id, attachments)
         issue.save!
+        document['attachment_ids'] = files.map(&:id)
+        self.data = document
         update!(state: 'applied')
       end
     end

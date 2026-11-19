@@ -21,6 +21,22 @@
     <% @document['result']['questions'].each do |question| %><li><%= question %></li><% end %>
     </ol>
   <% end %>
+  <% if @attachments.any? %>
+    <h3><%= @enhancement.state == 'applied' ? 'Generated attachments' : 'Proposed attachments' %></h3>
+    <p>Review these files before Apply. Applying the interactive draft adds them to the ticket with your journal update.</p>
+    <% @attachments.each_with_index do |attachment, index| %>
+      <div class="box">
+        <h4><%= attachment['name'] %></h4>
+        <p><%= link_to 'Download', download_issue_ai_attachment_path(@issue, @enhancement, index: index) %>
+          · <%= attachment['format'].upcase %></p>
+        <% if attachment['format'] == 'svg' %>
+          <%= image_tag download_issue_ai_attachment_path(@issue, @enhancement, index: index, preview: '1'), alt: attachment['name'], style: 'max-width:100%;max-height:650px;background:white;border:1px solid #d1d5db' %>
+        <% else %>
+          <details><summary>Preview text</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto"><%= attachment['content'] %></pre></details>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
   <h3>Retrieved sources</h3>
   <ul><% @document['sources'].each do |source| %>
     <li>[<%= source['id'] %>] <%= source['reference'] %> — revision: <%= source['revision'] %>
@@ -31,7 +47,7 @@
 <% if @enhancement.mode == 'interactive' && @enhancement.state == 'draft' %>
   <%= form_tag reply_issue_ai_enhancement_path(@issue, @enhancement) do %>
     <p><%= label_tag :reply, 'Answers, additional facts or instructions' %><br>
-    <%= text_area_tag :reply, '', rows: 7, maxlength: 8000, required: true, style: 'width:95%' %></p>
+    <%= text_area_tag :reply, '', rows: 7, maxlength: 8000, required: true, placeholder: 'For example: attach a proposed solution diagram, or create test cases as a CSV attachment.', style: 'width:95%' %></p>
     <%= submit_tag 'Revise with AI' %>
   <% end %>
   <br>

@@ -5,6 +5,7 @@ require 'action_dispatch/middleware/flash'
 require 'action_view'
 require 'rack/test'
 require_relative 'test_api_errors'
+require_relative 'test_artifacts'
 require_relative 'test_database_adapters'
 require_relative 'test_technical_sources'
 class ApplicationController < ActionController::Base
@@ -32,6 +33,7 @@ AiEnhancementsController.prepend_view_path File.expand_path('../app/views', __di
 AiSettingsController.prepend_view_path File.expand_path('../app/views', __dir__)
 
 class ControllerTest < PluginTest
+  include ArtifactFixtures
   include Rack::Test::Methods
   def app; ROUTES; end
 
@@ -104,6 +106,125 @@ class ControllerTest < PluginTest
     assert_equal 'queued', record.reload.state
     assert_includes record.data['messages'].last['text'], 'OTP confirmation'
     assert_equal 'payment error', @issue.reload.subject
+  end
+
+  def test_attachment_preview_download_are_private_and_do_not_attach_until_apply
+    record = attachment_draft
+    get "/issues/#{@issue.id}/ai_enhancements/#{record.id}"
+    assert_includes last_response.body, 'Proposed attachments'
+    assert_includes last_response.body, 'preview=1'
+    get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/attachments/0", {preview: '1'}
+    assert_equal 200, last_response.status
+    assert_includes last_response.headers['content-type'], 'image/svg+xml'
+    assert_includes last_response.headers['content-disposition'], 'inline'
+    assert_equal "sandbox; default-src 'none'", last_response.headers['content-security-policy']
+    assert_includes last_response.body, '<svg'
+    get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/attachments/1", {preview: '1'}
+    assert_includes last_response.headers['content-disposition'], 'attachment'
+    assert_equal 'Proposed test cases', last_response.body
+    assert_equal 0, Attachment.count
+    User.current = User.create!
+    assert_raises(ActiveRecord::RecordNotFound) { get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/attachments/0" }
+  end
+
+  def test_attachment_routes_reject_invalid_states_indices_and_revoked_permissions
+    record = attachment_draft
+    %w[-1 3 invalid].each do |index|
+      get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/attachments/#{index}"
+      assert_equal 404, last_response.status
+    end
+    record.update!(state: 'failed')
+    get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/attachments/0"
+    assert_equal 404, last_response.status
+    @user.update!(permitted: false)
+    get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/attachments/0"
+    assert_equal 403, last_response.status
+  end
+
+  def test_apply_attaches_files_once_with_author_and_journal
+    record = attachment_draft
+    record.apply_draft!
+    assert_equal 'applied', record.reload.state
+    assert_equal 2, @issue.attachments.count
+    assert_equal [@user.id], @issue.attachments.distinct.pluck(:author_id)
+    assert_equal record.data['attachment_ids'].sort, @issue.attachments.pluck(:id).sort
+    assert_includes @issue.attachments.find_by!(content_type: 'image/svg+xml').body, 'Proposed DNS failover design'
+    assert_raises(RedmineAi::Error) { record.apply_draft! }
+    assert_equal 2, Attachment.count
+  end
+
+  def test_attachment_apply_rolls_back_when_ticket_save_fails
+    record = attachment_draft
+    document = record.data
+    document['result']['fields'].find { |field| field['name'] == 'subject' }['value'] = 'Rejected by validation'
+    record.data = document
+    record.save!
+    assert_raises(ActiveRecord::RecordInvalid) { record.apply_draft! }
+    assert_equal 0, Attachment.count
+    assert_equal 'payment error', @issue.reload.subject
+    assert_equal 'draft', record.reload.state
+  end
+
+  def test_attachment_permission_and_concurrent_edit_are_rechecked_on_apply
+    record = attachment_draft
+    @user.update!(attachment_access: false)
+    assert_raises(RedmineAi::Error) { record.apply_draft! }
+    assert_equal 0, Attachment.count
+    @user.update!(attachment_access: true)
+    record = record.reload
+    @issue.update!(subject: 'Changed elsewhere')
+    assert_raises(RedmineAi::Error) { record.apply_draft! }
+    assert_equal 0, Attachment.count
+  end
+
+  def test_old_drafts_without_attachment_fields_still_apply
+    record = enhancement
+    document = record.data
+    document['result'].delete('attachments')
+    record.data = document
+    record.save!
+    record.apply_draft!
+    assert_equal 'applied', record.reload.state
+    assert_equal 0, Attachment.count
+  end
+
+  def test_attachment_validation_failure_closes_uploads_and_preserves_ticket
+    record = attachment_draft
+    uploads = []
+    invalid = Object.new
+    invalid.define_singleton_method(:valid?) { false }
+    Attachment.stub(:new, ->(**attributes) { uploads << attributes.fetch(:file); invalid }) do
+      error = assert_raises(RedmineAi::Error) { record.apply_draft! }
+      assert_includes error.message, 'Redmine file-size and extension settings'
+    end
+    assert uploads.all?(&:closed?)
+    assert_equal 0, Attachment.count
+    assert_equal 'payment error', @issue.reload.subject
+  end
+
+  def test_attachment_citations_are_validated_with_ticket_citations
+    draft = result
+    draft['attachments'] = [text_attachment('Evidence [S1]')]
+    fields = RedmineAi::Policy.text_fields(@issue, @user)
+    assert_raises(RedmineAi::Error) { RedmineAi::Policy.validate!(draft, fields, []) }
+    draft['source_ids'] = ['S1']
+    assert_equal draft, RedmineAi::Policy.validate!(draft, fields, ['S1'])
+  end
+
+  def test_api_generates_artifacts_only_for_interactive_review
+    draft = result
+    draft['attachments'] = [diagram_attachment]
+    body = {'status' => 'completed', 'output' => [{'content' => [{'type' => 'output_text', 'text' => JSON.generate(draft)}]}]}
+    with_api(body) do
+      assert_equal draft, RedmineAi::Client.generate(fields: RedmineAi::Policy.text_fields(@issue, @user), evidence: [], messages: [], mode: 'interactive')
+    end
+    with_api(body) do
+      error = assert_raises(RedmineAi::Error) do
+        RedmineAi::Client.generate(fields: RedmineAi::Policy.text_fields(@issue, @user), evidence: [], messages: [], mode: 'automatic')
+      end
+      assert_includes error.message, 'interactive preview and Apply'
+    end
+    assert_equal 0, Attachment.count
   end
 
   def test_disabled_or_unauthorized_access

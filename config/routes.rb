@@ -5,5 +5,6 @@ post 'admin/ai_enhancement/refresh_models', to: 'ai_settings#refresh_models', as
 post 'admin/ai_enhancement/reload_sources', to: 'ai_settings#reload_sources', as: :reload_ai_sources
 post 'issues/:issue_id/ai_enhancements', to: 'ai_enhancements#create', as: :issue_ai_enhancements
 get 'issues/:issue_id/ai_enhancements/:id', to: 'ai_enhancements#show', as: :issue_ai_enhancement
+get 'issues/:issue_id/ai_enhancements/:id/attachments/:index', to: 'ai_enhancements#attachment', as: :download_issue_ai_attachment
 post 'issues/:issue_id/ai_enhancements/:id/reply', to: 'ai_enhancements#reply', as: :reply_issue_ai_enhancement
 post 'issues/:issue_id/ai_enhancements/:id/apply', to: 'ai_enhancements#apply', as: :apply_issue_ai_enhancement

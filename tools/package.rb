@@ -6,7 +6,7 @@ require 'zlib'
 # Tar.gz needs only the Ruby standard library and preserves the required plugin folder name.
 root = File.expand_path('..', __dir__)
 FileUtils.mkdir_p(File.join(root, 'dist'))
-target = File.join(root, 'dist/redmine_ai_integration-1.1.3.tar.gz')
+target = File.join(root, 'dist/redmine_ai_integration-1.2.0.tar.gz')
 paths = %w[init.rb app assets config db lib].flat_map { |item| Dir.glob(File.join(root, item, '**/*')) + [File.join(root, item)] }.uniq.select { |file| File.file?(file) }
 Zlib::GzipWriter.open(target) do |gzip|
   Gem::Package::TarWriter.new(gzip) do |tar|

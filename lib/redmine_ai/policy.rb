@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 require 'digest'
 require 'json'
+require_relative 'artifacts'
 
 module RedmineAi
   module Policy
@@ -40,7 +41,9 @@ module RedmineAi
       end
       raise Error, 'Invalid questions.' unless result['questions'].size <= 8 && result['questions'].all? { |question| question.is_a?(String) && question.size <= 2000 }
       raise Error, 'Unknown source citation.' unless (result['source_ids'] - source_ids).empty?
-      citations = result['fields'].flat_map { |field| field['value'].scan(/\[(S\d+)\]/).flatten }.uniq
+      attachments = Artifacts.validate!(result.fetch('attachments', []))
+      citation_texts = result['fields'].map { |field| field['value'] } + Artifacts.citation_texts(attachments)
+      citations = citation_texts.flat_map { |value| value.scan(/\[(S\d+)\]/).flatten }.uniq
       raise Error, 'Unknown inline citation.' unless (citations - source_ids).empty?
       raise Error, 'Inline citations and source list disagree.' unless citations.sort == result['source_ids'].uniq.sort
       result

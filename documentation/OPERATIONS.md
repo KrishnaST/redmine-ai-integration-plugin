@@ -1,6 +1,6 @@
 # Operations
 
-Plugin 1.1.3 is deployed to server 215 as of 19 November 2026. Verified stack: Redmine 7.0.2.stable / Ruby 4.0.9 / Rails 8.1.4 / PostgreSQL 18.7. All four source drivers load, the structured settings page renders, and its JavaScript is served. The existing async backend is unchanged. Enhancement is enabled with a saved API key and zero sources. At the latest inspection the model was gpt-6.2-sol with low reasoning effort. At the user's explicit request, the AI module is enabled in all 34 active projects and the AI permission in all five signed-in roles; Anonymous is excluded and existing issue visibility/edit requirements remain. Review the [deployment record](DEPLOYMENT-2026-11-19.md) and reverify versions before future deployments.
+Plugin 1.2.0 is deployed to server 215 as of 19 November 2026. Verified stack: Redmine 7.0.2.stable / Ruby 4.0.9 / Rails 8.1.4 / PostgreSQL 18.7. All four source drivers load, the settings/attachment-preview pages render, and native SVG attachment validation passes without saving a file. The existing async backend is unchanged. Enhancement is enabled with a saved API key and zero sources. At the latest inspection the model was gpt-6.2-sol with low reasoning effort. At the user's explicit request, the AI module is enabled in all 34 active projects and the AI permission in all five signed-in roles; Anonymous is excluded and existing issue visibility/edit requirements remain. Review the [deployment record](DEPLOYMENT-2026-11-19.md) and reverify versions before future deployments.
 
 ## Endpoints
 
@@ -13,6 +13,7 @@ All paths are relative to Redmine's configured sub-URI (if any):
 | /admin/ai_enhancement/reload_sources | POST | Administrator background source test/reload |
 | /issues/:issue_id/ai_enhancements | POST | Create automatic or interactive enhancement |
 | /issues/:issue_id/ai_enhancements/:id | GET | Owner's private session |
+| /issues/:issue_id/ai_enhancements/:id/attachments/:index | GET | Owner's draft/applied file download; preview=1 permits inline generated SVG only |
 | /issues/:issue_id/ai_enhancements/:id/reply | POST | Owner's interactive revision |
 | /issues/:issue_id/ai_enhancements/:id/apply | POST | Owner's interactive apply |
 
@@ -58,5 +59,7 @@ Check API organization billing/credit balance and the key's project/organization
 Old failed sessions retain their original message; response bodies were deliberately not persisted, so their exact remote cause cannot be reconstructed. After correcting the cause, start a new enhancement. Never paste API keys into tickets, logs or documentation; replace exposed keys through the protected settings form.
 
 ## Rollback
+
+Version 1.2.0 adds generated SVG/text attachments in interactive mode. Drafts stay encrypted in the existing session payload; Apply uses native Redmine attachments and its issue journal inside the existing transaction. No database migration or new runtime dependency is added. The existing attachment storage/extension/size settings apply. Session cleanup preserves applied ticket attachments. See [attachment operations](ATTACHMENTS.md).
 
 Disable the plugin in Administration first. Drain/stop its default-queue work through the site's existing job operations. Remove its plugin directory and restart Redmine to remove UI/actions. Keep its table and Rails secret to preserve encrypted sessions. Reversing its migration deletes session data; do so only after backup and an explicit decision to remove that data. Applied issue changes remain in ordinary Redmine journal history and can be reviewed/restored through normal issue editing.

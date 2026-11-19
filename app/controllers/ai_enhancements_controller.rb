@@ -28,6 +28,20 @@ class AiEnhancementsController < ApplicationController
   def show
     @document = @enhancement.data
     @fields = RedmineAi::Policy.text_fields(@issue, User.current)
+    @attachments = %w[draft applied].include?(@enhancement.state) ? RedmineAi::Artifacts.validate!(@document.fetch('result', {}).fetch('attachments', [])) : []
+  end
+
+  def attachment
+    return head :not_found unless %w[draft applied].include?(@enhancement.state) && params[:index].to_s.match?(/\A[0-2]\z/)
+    attachments = RedmineAi::Artifacts.validate!(@enhancement.data.fetch('result', {}).fetch('attachments', []))
+    index = params[:index].to_i
+    return head :not_found unless attachments[index]
+    file = RedmineAi::Artifacts.file(attachments[index], @enhancement.id, index)
+    response.headers['Cache-Control'] = 'private, no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy'] = "sandbox; default-src 'none'"
+    disposition = params[:preview] == '1' && attachments[index]['format'] == 'svg' ? 'inline' : 'attachment'
+    send_data file.content, filename: file.filename, type: file.content_type, disposition: disposition
   end
 
   def reply

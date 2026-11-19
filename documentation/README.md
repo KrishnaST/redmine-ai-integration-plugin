@@ -3,6 +3,7 @@
 - [Installation, configuration and scope](../README.md)
 - [Operations and maintenance](OPERATIONS.md)
 - [Structured settings, API key, database drivers and source checks](SETTINGS.md)
+- [AI-generated diagrams and text attachments](ATTACHMENTS.md)
 - [Verification evidence and staging checklist](VERIFICATION.md)
 - [Deployment tooling and rollback procedure](DEPLOYMENT.md)
 - [Server 215 deployment record — 19 November 2026](DEPLOYMENT-2026-11-19.md)

@@ -52,12 +52,25 @@ class Project
 end
 ActiveRecord::Base.establish_connection(adapter: 'sqlite3', database: ':memory:')
 ActiveRecord::Schema.define do
-  create_table(:users) { |table| table.boolean :active, default: true; table.boolean :permitted, default: true }
+  create_table(:users) do |table|
+    table.boolean :active, default: true
+    table.boolean :permitted, default: true
+    table.boolean :attachment_access, default: true
+  end
   create_table(:issues) do |table|
     table.string :subject
     table.text :description
     table.integer :project_id, default: 1
     table.timestamps
+  end
+  create_table(:attachments) do |table|
+    table.string :container_type
+    table.integer :container_id
+    table.integer :author_id
+    table.string :filename
+    table.string :content_type
+    table.string :description
+    table.text :body
   end
 end
 class ApplicationRecord < ActiveRecord::Base
@@ -71,6 +84,8 @@ class User < ApplicationRecord
   def admin?; permitted; end
 end
 class Issue < ApplicationRecord
+  has_many :attachments, as: :container
+  validates :subject, exclusion: {in: ['Rejected by validation']}
   attr_reader :journal
   def project; project_id; end
   def visible?(*); true; end
@@ -80,6 +95,17 @@ class Issue < ApplicationRecord
   def custom_field_values; []; end
   def init_journal(user, notes); @journal = [user.id, notes]; end
   def safe_attributes=(attributes, _user = nil); assign_attributes(attributes); end
+  def attachments_addable?(user); user.permitted && user.attachment_access; end
+end
+class Attachment < ApplicationRecord
+  belongs_to :author, class_name: 'User'
+  belongs_to :container, polymorphic: true, optional: true
+  validates :filename, presence: true
+  def file=(file)
+    self.filename = file.original_filename
+    self.content_type = file.content_type
+    self.body = file.read.force_encoding(Encoding::UTF_8)
+  end
 end
 require_relative '../db/migrate/001_create_ai_enhancements'
 CreateAiEnhancements.new.migrate(:up)
@@ -90,6 +116,7 @@ ActiveJob::Base.logger = Logger.new(File::NULL)
 
 class PluginTest < Minitest::Test
   def setup
+    Attachment.delete_all
     AiEnhancement.delete_all
     Issue.delete_all
     User.delete_all
@@ -102,7 +129,7 @@ class PluginTest < Minitest::Test
   def result
     {'fields' => [{'name' => 'subject', 'value' => 'Transfer fails after confirmation'},
                   {'name' => 'description', 'value' => 'Actual behaviour: transfer fails after confirmation.'}],
-     'questions' => [], 'source_ids' => []}
+     'questions' => [], 'source_ids' => [], 'attachments' => []}
   end
 
   def enhancement(mode = 'interactive')

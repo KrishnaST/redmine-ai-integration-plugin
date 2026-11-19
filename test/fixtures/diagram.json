@@ -1,0 +1,21 @@
+{
+  "name": "Proposed solution diagram",
+  "format": "svg",
+  "content": "",
+  "diagram": {
+    "title": "Proposed DNS failover design",
+    "nodes": [
+      {"id": "app", "label": "Mobile application DNS lookup"},
+      {"id": "check", "label": "Endpoint health checks"},
+      {"id": "dns", "label": "Managed authoritative DNS"},
+      {"id": "primary", "label": "Primary endpoint"},
+      {"id": "secondary", "label": "Secondary endpoint"}
+    ],
+    "edges": [
+      {"from": "app", "to": "dns", "label": "Lookup"},
+      {"from": "check", "to": "dns", "label": "Endpoint selection"},
+      {"from": "dns", "to": "primary", "label": "Primary healthy"},
+      {"from": "dns", "to": "secondary", "label": "Primary unhealthy"}
+    ]
+  }
+}

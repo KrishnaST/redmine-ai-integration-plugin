@@ -12,11 +12,11 @@ Redmine::Plugin.register :redmine_ai_integration do
   name 'Redmine AI Integration'
   author 'KrishnaST'
   description 'Source-backed automatic and interactive ticket enhancement.'
-  version '1.1.3'
+  version '1.2.0'
   requires_redmine version_or_higher: '7.0.0'
   settings default: RedmineAi::Configuration::DEFAULTS, partial: 'settings/redmine_ai'
   project_module :redmine_ai_integration do
-    permission :enhance_issues_with_ai, {ai_enhancements: [:create, :show, :reply, :apply]}, require: :loggedin
+    permission :enhance_issues_with_ai, {ai_enhancements: [:create, :show, :reply, :apply, :attachment]}, require: :loggedin
   end
   menu :admin_menu, :redmine_ai_settings,
        {controller: 'ai_settings', action: 'edit'}, caption: 'AI ticket enhancement'

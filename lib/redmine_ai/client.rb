@@ -21,6 +21,14 @@ module RedmineAi
       record important unknowns in the description without fabricating answers.
       Return all and only the provided field names. source_ids lists only sources actually used.
       Use plain text headings and lists compatible with both Markdown and Textile. No raw HTML.
+      In interactive mode, when the user requests a diagram or attachment, propose it in attachments.
+      Use svg format for diagrams: supply a title, short labeled nodes and directed edges; content must
+      be empty. Never return raw SVG, HTML, binary data or remote image URLs. Label solution diagrams
+      as proposals, preserve uncertainties and cite supporting evidence just as in ticket text.
+      Text attachments may use md, txt, csv, json, sql or mmd with content and an empty diagram
+      (title empty, nodes and edges empty). Scripts are proposals only and must never be executed.
+      Return no more than three small attachments. Keep requested attachments in subsequent revisions
+      unless the user removes them. In automatic mode attachments must always be an empty array.
     TEXT
 
     def self.generate(fields:, evidence:, messages:, mode:)
@@ -32,8 +40,8 @@ module RedmineAi
           fields: {type: 'array', items: {type: 'object', additionalProperties: false,
             properties: {name: {type: 'string', enum: fields.keys}, value: {type: 'string'}}, required: %w[name value]}},
           questions: {type: 'array', items: {type: 'string'}},
-          source_ids: {type: 'array', items: {type: 'string'}}
-        }, required: %w[fields questions source_ids]
+          source_ids: {type: 'array', items: {type: 'string'}}, attachments: Artifacts.schema
+        }, required: %w[fields questions source_ids attachments]
       }
       request = Net::HTTP::Post.new(ENDPOINT)
       request['Authorization'] = "Bearer #{key}"
@@ -64,6 +72,7 @@ module RedmineAi
                 .select { |item| item['type'] == 'output_text' }.map { |item| item['text'] }.join
       result = Policy.validate!(JSON.parse(text), fields, evidence.map { |source| source['id'] })
       raise Error, 'Automatic enhancement unexpectedly requested interaction.' if mode == 'automatic' && result['questions'].any?
+      raise Error, 'Attachments require interactive preview and Apply.' if mode == 'automatic' && result.fetch('attachments', []).any?
       result
     rescue JSON::ParserError
       raise Error, 'OpenAI returned an invalid or refused draft.'
