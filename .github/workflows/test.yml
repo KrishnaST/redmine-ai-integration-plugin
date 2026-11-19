@@ -10,4 +10,6 @@ jobs:
                   ruby-version: '4.0'
                   bundler-cache: true
             - run: bundle exec ruby test/test_controllers.rb
-            - run: find app lib config db -name '*.rb' -exec ruby -c {} \;
+            - run: find app lib config db tools -name '*.rb' -exec ruby -c {} \;
+            - run: python3 -m unittest discover -s test -p test_deployment_environment.py
+            - run: bash -n tools/deployment/deploy.sh

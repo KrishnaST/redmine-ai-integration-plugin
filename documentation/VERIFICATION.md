@@ -17,4 +17,10 @@ OpenAI HTTP calls are simulated. No real API key or paid request is used. Redmin
 7. Click interactive enhancement, answer questions through two revisions, and apply. Test CSRF rejection, invalid API key, source outage, an intervening issue edit and lost permission.
 8. Confirm the real job worker, error handling and maintenance tasks. Test both the configured root and any reverse-proxy sub-URI. Verify backup/restore includes the Rails secret for encrypted drafts.
 
-No deployment, server migration, Redmine restart or live ticket modification was performed during this implementation.
+## Production deployment verification
+
+Plugin 1.0.0 from implementation commit ca01107 was deployed on server 215 on 19 November 2026, with database/config/plugin/attachment rollback backups. The session-table migration succeeded and the service restarted successfully. Public login returned HTTP 200; unauthenticated access to the AI administrator route returned HTTP 302. Live read-only inspection confirmed the session table and both foreign keys, controller loading, encryption roundtrip, default job queue and zero enhancement sessions. A harmless in-memory default-queue job ran successfully in the production Rails runner process; this does not establish durable execution across restarts or exercise a browser-triggered enhancement.
+
+No OpenAI request or live ticket modification was made. API key and sources remain unconfigured; the integration is disabled. The existing AsyncAdapter remains unchanged. Real source retrieval, paid API use and end-to-end issue editing remain pending. See [deployment evidence](DEPLOYMENT-2026-11-19.md).
+
+Deployment environment parsing also passes four Python standard-library tests. The helper never evaluates environment assignments as shell commands, and rejects unsupported syntax without echoing values. Python is optional deployment tooling, not a plugin runtime dependency.

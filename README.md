@@ -13,7 +13,7 @@ The Ruby plugin calls the OpenAI Responses API directly. No separate Java servic
 
 ## Install on the existing server
 
-Recorded target: `13.127.209.215`, application `/home/idsspl/redmine/native`, service `redmine-native.service`. Live installation has not been modified by this implementation.
+Deployed on **19 November 2026** to `13.127.209.215`, application `/home/idsspl/redmine/native`, service `redmine-native.service`. Plugin 1.0.0 is installed and its migration applied. AI enhancement remains disabled: the API key, sources and participating project access still need configuration. See the [deployment record](documentation/DEPLOYMENT-2026-11-19.md).
 
 1. Back up the Redmine database and attachment/configuration directories using the site's normal procedure.
 2. Clone the repository **outside** Redmine's plugin folder, then copy `init.rb`, `app/`, `config/`, `db/` and `lib/` into `plugins/redmine_ai_integration/`. Alternatively extract the packaged `.tar.gz` into `plugins/`. The directory must be named `redmine_ai_integration`.
@@ -91,6 +91,8 @@ bundle install
 bundle exec ruby test/test_controllers.rb
 ```
 
-The standalone harness exercises real Rails 8.1.4 persistence, migration, encryption, jobs, routes/controllers and ERB views with in-memory SQLite and Redmine interface doubles. OpenAI calls are simulated; tests make no paid API request or live database connection. Native Redmine deployment, theme rendering, installed job-backend behaviour and real API/database connectivity require staging verification. See [documentation index](documentation/README.md).
+The standalone harness exercises real Rails 8.1.4 persistence, migration, encryption, jobs, routes/controllers and ERB views with in-memory SQLite and Redmine interface doubles. OpenAI calls are simulated; tests make no paid API request or live database connection. Production loading, migration, encryption and an in-memory job probe were verified during deployment. Theme rendering, a browser-triggered enhancement and real API/source-database connectivity remain pending. See [documentation index](documentation/README.md).
 
 Use `ruby tools/package.rb` to create a deployable `.tar.gz` from production files only. A GitHub Actions workflow runs tests on pushes/PRs. The user has authorized commits/pushes for this repository; deployment remains a separate operation.
+
+Optional Linux deployment helpers live under `tools/deployment/` and are excluded from the plugin archive. They use the server's existing Python 3 only to launch commands with the service's protected environment; the plugin itself remains Ruby-only. Run `python -m unittest discover -s test -p test_deployment_environment.py` for the helper tests. Reviewed application, staging, service, environment-file, PostgreSQL-tool and health-URL values are command-line arguments, not embedded deployment credentials. See [deployment operations](documentation/DEPLOYMENT.md).

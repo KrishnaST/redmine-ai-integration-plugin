@@ -1,6 +1,6 @@
 # Operations
 
-No deployment was performed during implementation. Application: recorded Redmine 7.0.2 on server 215. Verify actual version and installed bundle before staging.
+Plugin 1.0.0 was deployed to server 215 on 19 November 2026. Verified stack: Redmine 7.0.2.stable / Ruby 4.0.9 / Rails 8.1.4 / PostgreSQL 18.7. The existing ActiveJob async backend is unchanged; enhancement remains disabled with no API key or sources configured. Review the [deployment record](DEPLOYMENT-2026-11-19.md) and reverify versions before future deployments.
 
 ## Endpoints
 
