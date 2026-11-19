@@ -1,0 +1,22 @@
+<h2>AI ticket enhancement</h2>
+<%= form_tag ai_settings_path do %>
+  <div class="box tabular">
+    <p><%= label_tag 'settings_enabled', 'Enabled' %><%= hidden_field_tag 'settings[enabled]', '0' %><%= check_box_tag 'settings[enabled]', '1', @settings['enabled'] == '1' %></p>
+    <p><%= label_tag :api_key, 'OpenAI API key' %><%= password_field_tag :api_key, '', autocomplete: 'new-password', size: 55 %><br>
+      <em>Blank retains the saved encrypted key. Alternatively set REDMINE_AI_OPENAI_API_KEY on the server.</em></p>
+    <p><%= label_tag :clear_api_key, 'Remove saved key' %><%= check_box_tag :clear_api_key, '1' %></p>
+    <p><%= label_tag 'settings_model', 'Model' %><%= text_field_tag 'settings[model]', @settings['model'], size: 50 %></p>
+    <p><%= label_tag 'settings_instructions', 'Enhancement instructions' %><%= text_area_tag 'settings[instructions]', @settings['instructions'], rows: 6, maxlength: 8000 %></p>
+    <p><%= label_tag 'settings_sources_json', 'Sources (JSON)' %><%= text_area_tag 'settings[sources_json]', @settings['sources_json'], rows: 18, style: 'width:75%;font-family:monospace' %></p>
+  </div>
+  <%= submit_tag 'Save' %>
+<% end %>
+<p>Enable the AI integration project module and grant the “Enhance issues with AI” role permission. Users also require ticket-edit permission.</p>
+<p>Each source is explicitly assigned to project IDs. Anyone granted enhancement access in those projects can receive excerpts from that source. Use curated files without credentials or personal data. Selected excerpts are sent to OpenAI.</p>
+<p>File roots must exist on the Redmine server. List individual UTF-8 text/code files; no recursive directory ingestion. For PDF/Word, export a reviewed text version first.</p>
+<pre style="white-space:pre-wrap"><%= JSON.pretty_generate([
+  {name: 'cbs_docs', type: 'files', project_ids: [1], root: '/srv/redmine-ai/docs', files: ['payments.md'], revision: '2026-11-19'},
+  {name: 'cbs_code', type: 'files', project_ids: [1], root: '/srv/redmine-ai/code', files: ['src/PaymentService.java'], revision: 'git-commit-sha'},
+  {name: 'cbs_schema', type: 'postgres_schema', project_ids: [1], url_env: 'REDMINE_AI_CBS_DATABASE_URL', schema: 'public'}
+]) %></pre>
+<p>Database sources use PostgreSQL schema metadata only, in a read-only transaction with a statement timeout. Set the URL through a protected server environment variable using a dedicated metadata-only role. Other database engines can supply reviewed DDL files through file sources.</p>

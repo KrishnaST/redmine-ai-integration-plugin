@@ -1,0 +1,7 @@
+<% if RedmineAi::Configuration.values['enabled'] == '1' && RedmineAi::Policy.allowed?(issue, User.current) %>
+  <div class="ai-enhancement-actions">
+    <%= link_to 'Enhance with AI', issue_ai_enhancements_path(issue, mode: 'automatic'), method: :post, class: 'icon icon-edit' %>
+    &nbsp; | &nbsp;
+    <%= link_to 'Enhance with AI Interactively', issue_ai_enhancements_path(issue, mode: 'interactive'), method: :post, class: 'icon icon-comment' %>
+  </div>
+<% end %>
