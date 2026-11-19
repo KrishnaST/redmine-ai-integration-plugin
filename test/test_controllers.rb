@@ -4,6 +4,8 @@ require 'action_controller'
 require 'action_view'
 require 'action_dispatch/middleware/flash'
 require 'rack/test'
+require_relative 'test_technical_sources'
+require_relative 'test_database_adapters'
 class ApplicationController < ActionController::Base
   def require_login
     head :unauthorized unless User.current
@@ -96,5 +98,45 @@ class ControllerTest < PluginTest
     @user.update!(permitted: false)
     get '/admin/ai_enhancement'
     assert_equal 403, last_response.status
+  end
+
+  def test_structured_settings_controls_and_database_password_secrecy
+    get '/admin/ai_enhancement'
+    assert_equal 200, last_response.status
+    assert_includes last_response.body, '<select name="settings[model]"'
+    refute_includes last_response.body, 'settings[instructions]'
+    refute_includes last_response.body, 'settings[sources_json]'
+    assert_includes last_response.body, 'Code folder'
+    assert_includes last_response.body, 'Documents folder'
+    assert_includes last_response.body, 'Microsoft SQL Server'
+    assert_includes last_response.body, 'Include table samples'
+    assert_includes last_response.body, 'Test/reload sources'
+    fields = {'name' => 'db', 'type' => 'database', 'project_ids' => ['1'], 'db_type' => 'postgresql',
+              'host' => '127.0.0.1', 'port' => '5432', 'database' => 'example', 'schema' => 'public',
+              'username' => 'example', 'password' => 'synthetic-private-password',
+              'include_table_data' => '1', 'sample_tables' => {'0' => {'table' => 'codes', 'columns' => 'code, description', 'limit' => '5'}}}
+    post '/admin/ai_enhancement', {settings: {enabled: '0', model: 'test-model'}, sources_present: '1', sources: {'0' => fields}}
+    assert_equal 302, last_response.status
+    source = RedmineAi::Configuration.sources.first
+    assert_equal 'synthetic-private-password', RedmineAi::SourceConfiguration.password(source)
+    assert_equal %w[code description], source['sample_tables'].first['columns']
+    get '/admin/ai_enhancement'
+    assert_equal 200, last_response.status
+    refute_includes last_response.body, 'synthetic-private-password'
+    refute_includes last_response.body, source['password_encrypted']
+    FileUtils.mkdir_p(File.expand_path('../tmp', __dir__))
+    File.write(File.expand_path('../tmp/settings-form.html', __dir__), last_response.body)
+  end
+
+  def test_source_reload_is_admin_only_and_post_only
+    AiSourceCheckJob.stub(:perform_later, true) do
+      post '/admin/ai_enhancement/reload_sources'
+      assert_equal 302, last_response.status
+    end
+    @user.update!(permitted: false)
+    post '/admin/ai_enhancement/reload_sources'
+    assert_equal 403, last_response.status
+    get '/admin/ai_enhancement/reload_sources'
+    assert_equal 404, last_response.status
   end
 end

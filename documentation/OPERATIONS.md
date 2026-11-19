@@ -1,6 +1,6 @@
 # Operations
 
-Plugin 1.0.0 was deployed to server 215 on 19 November 2026. Verified stack: Redmine 7.0.2.stable / Ruby 4.0.9 / Rails 8.1.4 / PostgreSQL 18.7. The existing ActiveJob async backend is unchanged; enhancement remains disabled with no API key or sources configured. Review the [deployment record](DEPLOYMENT-2026-11-19.md) and reverify versions before future deployments.
+Plugin 1.1.0 is deployed to server 215 as of 19 November 2026. Verified stack: Redmine 7.0.2.stable / Ruby 4.0.9 / Rails 8.1.4 / PostgreSQL 18.7. All four source drivers load, the structured settings page renders, and its JavaScript is served. The existing async backend is unchanged. API enhancement remains disabled with no API key or sources configured. Review the [deployment record](DEPLOYMENT-2026-11-19.md) and reverify versions before future deployments.
 
 ## Endpoints
 
@@ -9,6 +9,8 @@ All paths are relative to Redmine's configured sub-URI (if any):
 | Endpoint | Method | Access |
 |---|---|---|
 | /admin/ai_enhancement | GET / POST | Administrator settings |
+| /admin/ai_enhancement/refresh_models | POST | Administrator model-list refresh |
+| /admin/ai_enhancement/reload_sources | POST | Administrator background source test/reload |
 | /issues/:issue_id/ai_enhancements | POST | Create automatic or interactive enhancement |
 | /issues/:issue_id/ai_enhancements/:id | GET | Owner's private session |
 | /issues/:issue_id/ai_enhancements/:id/reply | POST | Owner's interactive revision |
@@ -23,10 +25,16 @@ Ticket access and enhancement/edit permissions are required at each issue endpoi
 - Existing Rails secret/key generator: encryption for credentials and sessions.
 - Existing ActiveJob backend with default-queue workers: background enhancement.
 - Existing pg gem: required only for live PostgreSQL metadata sources. Redmine on PostgreSQL already supplies it.
+- Optional ruby-oci8, tiny_tds and mysql2 client gems for the matching source types; they must be available in Redmine's bundle. See [driver setup](SETTINGS.md).
+- Oracle client ORACLE_HOME / LD_LIBRARY_PATH in the existing service environment if required by its native client. These are library paths, not connection credentials.
 - OpenAI Responses API HTTPS connectivity and funded API account with selected-model access.
 - Readable curated source roots on the server. Content is not fetched from workstation paths.
 
 No additional production gems are installed by the plugin. The root Gemfile is for its isolated tests.
+
+Version 1.1.0 uses structured source forms, a model dropdown and explicit Test/reload rather than startup scanning. Database credentials are encrypted in plugin settings. Optional table samples default off and require explicit tables/columns/row limits. PostgreSQL/Oracle/MySQL use read-only transaction controls; SQL Server executes SELECT-only queries with no role/replica restrictions. The operator installs any required optional native client gems; the plugin does not install them from web requests.
+
+AiSourceCheckJob uses the default queue and does not call OpenAI. It records only statuses/counts, not source contents or sample rows. Changing source settings invalidates old results; token/fingerprint checks plus a settings-row lock prevent late results from replacing newer configuration. A lost async job can leave a queued check; use Test/reload again. Enhancement instructions have been removed from configuration and older saved guidance is ignored.
 
 ## Jobs and retention
 

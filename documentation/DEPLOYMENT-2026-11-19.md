@@ -1,6 +1,6 @@
 # Server 215 deployment — 19 November 2026
 
-## Installed state
+## Initial 1.0.0 installation (superseded by 1.1.0 below)
 
 - Server: 13.127.209.215; portal: https://redmine.dynamicbanksoft.com/.
 - Application: `/home/idsspl/redmine/native`; service: `redmine-native.service`, running as idsspl.
@@ -34,3 +34,15 @@ It contains the pre-deployment database dump (about 281 KiB), validated database
 Integration is **disabled**, API key is absent, and sources count is zero. Configure these at `/admin/ai_enhancement`, then explicitly enable selected project modules and grant the enhancement role permission. No project memberships, roles, notification settings, gateway configuration or workflow values were changed during deployment.
 
 The existing backend remains `ActiveJob::QueueAdapters::AsyncAdapter`. Its in-memory jobs are not durable across process restarts. Production durable-worker adoption is a separate infrastructure change. A real browser-driven enhancement, real OpenAI response and real source retrieval remain unverified until credentials and project sources are configured.
+
+## Structured settings upgrade to 1.1.0
+
+The configuration update was deployed and the service restarted at **2026-11-19T13:44:01+05:30**. Rollback material is under:
+
+`/home/idsspl/redmine/ai-integration-deployment/settings-upgrade-20261119T081252Z/`
+
+It includes the previous plugin, database/config/plugin/bundle/environment backup, migration and asset-build logs, and private verification JSON. No additional plugin migration was needed. The settings page renders a model dropdown, structured code/document/database sources and table-sample controls; enhancement instructions and raw source JSON controls are absent. Its fingerprinted settings JavaScript and public login both return HTTP 200.
+
+Installed optional drivers load on Ruby 4.0.9: pg 1.6.3, ruby-oci8 2.2.14, tiny_tds 3.4.1 and mysql2 0.5.7. Six new small FreeTDS/MariaDB client packages were installed without upgrading existing OS packages. Gemfile.local contains optional require:false declarations. Oracle client libraries/headers plus timezone/NLS resources are copied into the app's private vendor/redmine-ai-oracle-client-19 directory because the Oracle database home's client libraries are owner-readable only. The original Oracle home permissions/files are unchanged. ORACLE_HOME and LD_LIBRARY_PATH are scoped to Redmine's existing private service environment. Native dependency setup backups/logs are in sibling source-drivers-* directories; they contain protected configuration and are not committed.
+
+A live PostgreSQL adapter probe retrieved **61 tables / 462 columns**, with read-only metadata queries and **zero sample rows**. A real empty-source Test/reload job completed and persisted its completed state. Other engine drivers were loaded, but no Oracle/SQL Server/MySQL source connection or sample-data query was attempted because no source credentials/configuration were supplied. API calls remain untested and no paid generation was requested. No live tickets, project access or issue workflow values were changed.

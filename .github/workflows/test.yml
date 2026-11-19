@@ -10,6 +10,12 @@ jobs:
                   ruby-version: '4.0'
                   bundler-cache: true
             - run: bundle exec ruby test/test_controllers.rb
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '24'
+            - run: npm install --prefix tools/runtime/javascript --cache tools/runtime/npm-cache --no-audit --no-fund --package-lock=false jsdom@31.0.1
+            - run: node test/test_settings_js.cjs
             - run: find app lib config db tools -name '*.rb' -exec ruby -c {} \;
             - run: python3 -m unittest discover -s test -p test_deployment_environment.py
             - run: bash -n tools/deployment/deploy.sh
+            - run: for script in tools/deployment/upgrade.sh tools/deployment/install_source_drivers.sh; do bash -n "$script" || exit; done

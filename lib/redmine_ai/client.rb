@@ -39,7 +39,7 @@ module RedmineAi
       request['Content-Type'] = 'application/json'
       request.body = JSON.generate(model: Configuration.values.fetch('model'), store: false,
         max_output_tokens: 8000,
-        input: [{role: 'system', content: SYSTEM + "\nAdministrator guidance:\n" + Configuration.values['instructions'].to_s},
+        input: [{role: 'system', content: SYSTEM},
                 {role: 'user', content: JSON.generate(mode: mode, ticket_fields: fields, evidence: evidence, conversation: messages)}],
         text: {format: {type: 'json_schema', name: 'ticket_enhancement', strict: true, schema: schema}})
       body = +''

@@ -1,98 +1,92 @@
 # Redmine AI Integration
 
-Source-backed automatic and interactive ticket enhancement for Redmine 7.0 / Ruby 4 / Rails 8.1. Version 1.0.0.
+Version 1.1.0. Source-backed automatic and interactive ticket enhancement for Redmine 7.0 / Ruby 4 / Rails 8.1.
 
-After a ticket is created, permitted users see **Enhance with AI** and **Enhance with AI Interactively** in the issue details.
+Existing issues expose **Enhance with AI** (improve and save editable textual fields with a journal) and **Enhance with AI Interactively** (questions, revisions and Apply). Status, assignee, priority, dates and non-text workflow fields retain their values. Users need issue-edit and enhancement permissions, and the project module must be enabled.
 
-- **Enhance with AI** retrieves configured context, improves every editable textual ticket field, and saves automatically with a Redmine journal. No confirmation or answers are needed after clicking.
-- **Enhance with AI Interactively** generates a draft and targeted questions. Users supply answers, facts and instructions, request revisions, then apply the draft.
-- Subject, description and editable single-value string/text custom fields are supported. Workflow-controlled values such as status, priority, assignee, dates and numeric/list custom fields retain their values; an AI wording change does not imply authorization to change workflow or ownership. Existing journal history is retained.
-- Administration → **AI ticket enhancement** configures the model, encrypted API key, enhancement instructions and project-scoped sources.
+The plugin calls OpenAI directly from Ruby using the existing ActiveJob default queue. There is no separate AI service.
 
-The Ruby plugin calls the OpenAI Responses API directly. No separate Java service is required. It uses Redmine's existing Rails/ActiveJob and PostgreSQL driver; the root Gemfile is **test tooling only**, not a production plugin Gemfile.
+## Configure in Redmine
 
-## Install on the existing server
+Open **Administration → AI ticket enhancement**.
 
-Deployed on **19 November 2026** to `13.127.209.215`, application `/home/idsspl/redmine/native`, service `redmine-native.service`. Plugin 1.0.0 is installed and its migration applied. AI enhancement remains disabled: the API key, sources and participating project access still need configuration. See the [deployment record](documentation/DEPLOYMENT-2026-11-19.md).
+1. Enter the OpenAI API key and save. Blank retains the encrypted key; Remove saved key clears it.
+2. Select a **Model** from the dropdown. **Refresh models** retrieves text-model IDs available to the saved key; use a model supporting Responses and structured output. The default choices are GPT-6.2 Astra, GPT-6.2 Sol, GPT-6.1 Terra and GPT-6 Luna. A stored older model remains selectable.
+3. Add **Code folder**, **Documents folder** or **Database** sources with the structured controls. No raw JSON or enhancement-instructions field is shown.
+4. Assign each source to specific projects. These mappings grant enhancement users in those projects access to retrieved excerpts, including approved table samples.
+5. Save, then click **Test/reload sources**. This checks current files, schema metadata and opted-in samples in a background job without calling OpenAI. Results show success/failure and counts. Refresh the page for completion.
+6. Enable the integration. In each participating project enable **Redmine AI Integration**, then grant the role **Enhance issues with AI** alongside **Edit issues**.
 
-1. Back up the Redmine database and attachment/configuration directories using the site's normal procedure.
-2. Clone the repository **outside** Redmine's plugin folder, then copy `init.rb`, `app/`, `config/`, `db/` and `lib/` into `plugins/redmine_ai_integration/`. Alternatively extract the packaged `.tar.gz` into `plugins/`. The directory must be named `redmine_ai_integration`.
-3. From the Redmine application root, with its existing production environment loaded:
+There is no scan at Redmine startup. Enhancement requests read the current sources; Test/reload verifies them rather than building a semantic/vector index. Changed source configuration invalidates previous check results.
 
-   ```sh
-   RAILS_ENV=production bundle exec rake redmine:plugins:migrate NAME=redmine_ai_integration
-   ```
+### API key
 
-4. Restart Redmine. A plugin migration creates only its encrypted enhancement-session table; it does not alter business application schemas.
-5. Open Administration → AI ticket enhancement, configure an API key and available Responses API model, add source definitions, and enable the integration.
-6. In each participating project enable the **Redmine AI Integration** module. Grant the **Enhance issues with AI** role permission alongside edit-issues permission.
-7. Ensure Redmine's ActiveJob backend/worker processes the `default` queue. An in-process async backend is suitable for evaluation but jobs can be lost on process restart; use the site's durable job backend for production. The plugin does not change the existing backend.
+Create a key in an OpenAI API project at [API keys](https://platform.openai.com/api-keys), copy it when shown, and paste it directly into the plugin's password field. Full secret values are only displayed at creation. Configure API billing separately from ChatGPT. The key needs Responses access; Refresh models additionally needs model-list access.
 
-Outbound HTTPS to `api.openai.com:443` is required. API usage is billed to the configured OpenAI API account. No API key is included in this repository.
+- [Official key guidance](https://help.openai.com/en/articles/4936850-where-do-i-find-my-openai-api-key)
+- [API billing](https://platform.openai.com/settings/organization/billing/overview)
+- [Billing separation](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform)
 
-## Configure sources
+An optional existing service environment variable, REDMINE_AI_OPENAI_API_KEY, remains supported. The encrypted administrator key takes precedence.
 
-Sources JSON is managed in Administration. Each source requires an explicit list of numeric Redmine project IDs. Users with enhancement permission in those projects can receive source excerpts through generated tickets, so each mapping grants access to that knowledge.
+## Technical sources
 
-```json
-[
-  {
-    "name": "payments_docs",
-    "type": "files",
-    "project_ids": [1],
-    "root": "/srv/redmine-ai/docs",
-    "files": ["payments.md", "operations.txt"],
-    "revision": "2026-11-19"
-  },
-  {
-    "name": "payments_code",
-    "type": "files",
-    "project_ids": [1],
-    "root": "/srv/redmine-ai/code",
-    "files": ["src/PaymentService.java"],
-    "revision": "verified-git-commit-sha"
-  },
-  {
-    "name": "payments_schema",
-    "type": "postgres_schema",
-    "project_ids": [1],
-    "url_env": "REDMINE_AI_PAYMENTS_DATABASE_URL",
-    "schema": "payments"
-  }
-]
+**Folders:** enter absolute paths on the Redmine server, not workstation paths. Supported UTF-8 text/code files are discovered recursively. Hidden directories, symlinks, build/dependency outputs, credential-related names and common application/bootstrap credential configuration files are excluded. Limits: 500 eligible files per folder, 20,000 traversed entries, 2 MB per file, and a 10 MB shared file-read budget per enhancement/check. PDF/Word/binary documents need reviewed text exports. Use approved source folders without secrets or personal data; filename exclusions are not a complete data-classification system.
+
+**Database:** select PostgreSQL, Oracle, Microsoft SQL Server or MySQL, then enter IP/hostname, port, database (Oracle service name), schema/owner, username and password. Passwords are encrypted using Redmine's existing secret and never redisplayed. A blank password retains it only while connection identity stays unchanged. Changing its address/type/database/user clears the retained password unless a new one is entered.
+
+Adapters retrieve column types/nullability/size and primary/unique/foreign-key metadata. Queries are application-defined SELECTs, never AI-generated SQL. PostgreSQL, Oracle and MySQL also use read-only transaction controls. SQL Server executes SELECT statements only, with no role/replica restriction, as explicitly requested. No DDL, DML, login changes or privilege changes are performed on source databases.
+
+**Include table samples** is off by default. If enabled, explicitly list 1–10 tables, their 1–20 allowed columns, and 1–20 rows per table. Exact identifiers are checked against freshly read schema metadata before sampling. Values are limited to 500 characters at query time. These approved samples become AI context for the mapped projects; query results are not written to diagnostic logs. Sampling is bounded and unordered, not a full table export. Use exact identifier case; Oracle names are commonly uppercase.
+
+### Driver prerequisites
+
+| Engine | Ruby driver | Native prerequisites |
+|---|---|---|
+| PostgreSQL | pg (already supplied by a PostgreSQL Redmine installation) | libpq |
+| Oracle | ruby-oci8 | Oracle client libraries/headers; compatible runtime library path |
+| SQL Server | tiny_tds | FreeTDS libraries/headers unless supplied by a compatible binary gem |
+| MySQL | mysql2 | MySQL/MariaDB client libraries/headers |
+
+Optional source drivers must be declared in Redmine's existing Gemfile.local and installed into its bundle. They are not mandatory for wording-only enhancement. Current reviewed versions: ruby-oci8 2.2.14, tiny_tds 3.4.1, mysql2 0.5.7; native compatibility must be verified on the target Ruby/client stack. See [settings and driver setup](documentation/SETTINGS.md). Missing drivers are reported by Test/reload; selecting a type alone does not install system software.
+
+Existing explicit-file and environment-URL PostgreSQL source definitions remain readable/editable for compatibility. Remove and replace a legacy source to use the new discrete connection fields.
+
+## Reliability and privacy
+
+Keys and database passwords are encrypted using Redmine's existing secret. Enhancement drafts, conversations and citation metadata are encrypted in ai_enhancements.payload. Selected ticket fields, conversation and retrieved source excerpts/samples are sent to OpenAI with store:false; account data-retention terms still apply. Connection credentials are excluded from evidence and prompts.
+
+Only the initiating user can access an enhancement session, with current issue visibility/edit and enhancement permissions rechecked. Apply locks the session and issue, checks the original fingerprint, validates field names and citations, then uses Redmine's safe-attribute/journal APIs. Concurrent edits are preserved. AI calls occur outside database transactions. No generated SQL is executed.
+
+Retrieval uses bounded keyword matching of 40-line passages, not exhaustive code analysis. Context is limited to 32,000 characters and 4,000 characters per excerpt. Missing/unreadable sources produce warnings; unsupported AI output fails without changing the issue. Fixed built-in instructions preserve facts and label unknowns; administrator enhancement instructions have been removed and old saved values are ignored.
+
+The existing ActiveJob backend must process the default queue. AsyncAdapter is suitable for evaluation but loses in-memory work on restart; durable production jobs remain an infrastructure decision. Maintenance tasks and failure handling are documented in [operations](documentation/OPERATIONS.md).
+
+## Installation and updates
+
+Target: server 13.127.209.215, application /home/idsspl/redmine/native, service redmine-native.service. Version 1.1.0 is deployed; the initial installation and structured-settings upgrade are recorded in [deployment evidence](documentation/DEPLOYMENT-2026-11-19.md).
+
+Build with ruby tools/package.rb. The production archive dist/redmine_ai_integration-1.1.0.tar.gz contains only init.rb, app/, assets/, config/, db/ and lib/, under the required folder redmine_ai_integration. For a source checkout, copy those same production paths into plugins/redmine_ai_integration; do not copy the test Gemfile or development runtime.
+
+Back up the existing app/database, replace the plugin's production files, run the plugin migration task from the Redmine root, publish/precompile plugin assets using the site's normal Redmine asset procedure, and restart Redmine:
+
+```sh
+RAILS_ENV=production bundle exec rake redmine:plugins:migrate NAME=redmine_ai_integration
 ```
 
-File roots refer to the **Redmine server**, not the administrator's workstation. Use reviewed UTF-8 documentation, code and DDL exports. Files are explicitly listed; traversal/symlink escapes, binary files, files over 2 MB and credential-related filenames are excluded. PDF/Word inputs require reviewed text exports. No automatic repository clone, arbitrary URL fetching, recursive crawling or private repository credentials are used. Update the server-side checkout/files and revision when a release changes. References include file/line ranges and SHA-256 hashes.
+Version 1.1.0 adds no database migration beyond the existing enhancement-session table. Settings compatibility is retained. No API key, source mapping, project membership or role permission is automatically enabled by installation.
 
-File scanning is bounded to 10 MB per enhancement across all file sources; exceeding the budget produces a source warning. Retrieval ranks 40-line passages by ticket/conversation keyword overlap, then supplies at most 32,000 characters, with at most 4,000 characters per passage. It is a bounded lexical retrieval implementation, not an exhaustive code analyzer or semantic index. No matching sources means wording enhancement uses the ticket facts alone; an unreadable configured source produces a warning. Automatic updates record these warnings in the issue journal.
-
-PostgreSQL live sources retrieve columns/types/nullability/size and primary/unique/foreign-key definitions in an explicit read-only transaction with connection and statement timeouts. Use a dedicated metadata-only login in the configured URL environment variable. Business records, generated SQL and database writes are unsupported. Oracle/MSSQL can supply authoritative schema exports as file sources; native live adapters are not included in 1.0. No operational database access is required to improve wording alone.
-
-## Credentials and storage
-
-API keys entered through the administrator form are encrypted using a key derived from Redmine's existing secret. Blank input retains the saved key; removal clears it. Alternatively use `REDMINE_AI_OPENAI_API_KEY` in the existing protected service environment. Database URLs are referenced through administrator-selected environment variable names; do not put credentials in Sources JSON.
-
-Enhancement conversations, draft output and source references are encrypted at rest in `ai_enhancements.payload`. Losing/changing the Rails secret prevents decryption. Successful applied ticket content and journal evidence are normal Redmine data with the issue's existing access rules. Selected ticket fields, conversation and retrieved excerpts are sent to OpenAI with `store:false`; that flag does not override the API account's applicable data-retention policy.
-
-Sessions are visible only to the initiating user and require current issue visibility/edit rights. Authorization is checked on requests, job execution and apply. CSRF protection is inherited from Redmine; all mutations use POST. The API endpoint is fixed HTTPS. No remote response bodies, source contents, API keys or raw database error messages are written to plugin diagnostic logs.
-
-## Reliability and behaviour
-
-Jobs call OpenAI outside database transactions. Apply locks the enhancement and issue, validates output field names and source IDs, rechecks permissions and the original issue fingerprint, and uses Redmine's safe attributes and journal APIs. If the issue changed, the enhancement is blocked instead of overwriting newer edits. A successfully applied job cannot apply again.
-
-Output uses strict JSON Schema and application validation; refused, incomplete, oversized or invalid API responses fail without changing the ticket. Evidence is untrusted data. Prompts instruct the model to distinguish facts, hypotheses and unknowns, and prevent unsupported technical claims. Citations identify supporting excerpts but are not proof that every generated statement is correct. Interactive enhancement is appropriate when missing facts require reporter input.
-
-The status page refreshes while work is queued/processing. A failed/conflicting enhancement can be restarted from the issue buttons. Concurrent active enhancements are rejected for ten minutes. Jobs interrupted by process termination can remain queued/processing; they are not automatically replayed. Review/clean them using the maintenance tasks in [operations](documentation/OPERATIONS.md).
-
-## Development and verification
+## Development
 
 ```sh
 bundle install
 bundle exec ruby test/test_controllers.rb
+npm install --prefix tools/runtime/javascript --cache tools/runtime/npm-cache --no-audit --no-fund --package-lock=false jsdom@31.0.1
+node test/test_settings_js.cjs
+python -m unittest discover -s test -p test_deployment_environment.py
+ruby tools/package.rb
 ```
 
-The standalone harness exercises real Rails 8.1.4 persistence, migration, encryption, jobs, routes/controllers and ERB views with in-memory SQLite and Redmine interface doubles. OpenAI calls are simulated; tests make no paid API request or live database connection. Production loading, migration, encryption and an in-memory job probe were verified during deployment. Theme rendering, a browser-triggered enhancement and real API/source-database connectivity remain pending. See [documentation index](documentation/README.md).
+The Ruby harness uses real Rails 8.1.4 persistence/controllers/jobs with SQLite and Redmine interface doubles; API and adapter calls are simulated. The JavaScript test uses a rendered form and jsdom; jsdom/Node/Python are development/deployment tooling only, excluded from the plugin package. Native database connectivity and paid API responses require real configured credentials. CI runs these checks. Commits/pushes are authorized for this repository; production rollout uses the recorded deployment process.
 
-Use `ruby tools/package.rb` to create a deployable `.tar.gz` from production files only. A GitHub Actions workflow runs tests on pushes/PRs. The user has authorized commits/pushes for this repository; deployment remains a separate operation.
-
-Optional Linux deployment helpers live under `tools/deployment/` and are excluded from the plugin archive. They use the server's existing Python 3 only to launch commands with the service's protected environment; the plugin itself remains Ruby-only. Run `python -m unittest discover -s test -p test_deployment_environment.py` for the helper tests. Reviewed application, staging, service, environment-file, PostgreSQL-tool and health-URL values are command-line arguments, not embedded deployment credentials. See [deployment operations](documentation/DEPLOYMENT.md).
+See the [documentation index](documentation/README.md).

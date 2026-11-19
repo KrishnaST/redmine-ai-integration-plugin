@@ -1,0 +1,38 @@
+<fieldset class="box ai-source" data-source-index="<%= index %>">
+  <legend>Technical source</legend>
+  <% prefix = "sources[#{index}]" %>
+  <%= hidden_field_tag "#{prefix}[id]", source['id'] %>
+  <p><label>Name <%= text_field_tag "#{prefix}[name]", source['name'], placeholder: 'cbs_code', required: true %></label>
+    <label>Source type <%= select_tag "#{prefix}[type]", options_for_select([['Code folder', 'code_folder'], ['Documents folder', 'documents_folder'], ['Database', 'database']] + (%w[files postgres_schema].include?(source['type']) ? [['Existing explicit source', source['type']]] : []), source['type']), class: 'ai-source-type' %></label>
+    <button type="button" class="ai-remove-source">Remove source</button></p>
+  <p><label>Projects <%= select_tag "#{prefix}[project_ids][]", options_for_select(@projects, source['project_ids']), multiple: true, size: 4, required: true %></label></p>
+  <div class="ai-folder-fields">
+    <p><label>Server folder path <%= text_field_tag "#{prefix}[root]", source['root'], size: 70, placeholder: '/srv/approved-source' %></label></p>
+    <p>Subfolders are included. Hidden directories, dependencies/build outputs, credential-related files and symlinks are excluded. Maximum 500 eligible files per folder.</p>
+  </div>
+  <div class="ai-database-fields">
+    <p><label>Database type <%= select_tag "#{prefix}[db_type]", options_for_select([['PostgreSQL', 'postgresql'], ['Oracle', 'oracle'], ['Microsoft SQL Server', 'sqlserver'], ['MySQL', 'mysql']], source['db_type']), class: 'ai-db-type' %></label>
+      <label>IP / hostname <%= text_field_tag "#{prefix}[host]", source['host'], placeholder: '10.0.0.10' %></label>
+      <label>Port <%= number_field_tag "#{prefix}[port]", source['port'], min: 1, max: 65535, class: 'ai-db-port' %></label></p>
+    <p><label>Database / Oracle service name <%= text_field_tag "#{prefix}[database]", source['database'] %></label>
+      <label>Schema / Oracle owner <%= text_field_tag "#{prefix}[schema]", source['schema'], placeholder: 'public / dbo / OWNER' %></label></p>
+    <p><label>Username <%= text_field_tag "#{prefix}[username]", source['username'], autocomplete: 'off' %></label>
+      <label>Password <%= password_field_tag "#{prefix}[password]", '', autocomplete: 'new-password' %></label>
+      <% if source['password_encrypted'].present? %><em>A password is saved.</em><% end %>
+      <label><%= check_box_tag "#{prefix}[clear_password]", '1' %> Clear saved password</label></p>
+    <p>Blank retains the password only while database type, address, port, database and username are unchanged. No account-role or replica restrictions are imposed. Metadata and approved sample queries are SELECT-only; PostgreSQL/Oracle/MySQL also use read-only transaction controls.</p>
+    <p><label><%= check_box_tag "#{prefix}[include_table_data]", '1', source['include_table_data'], class: 'ai-sample-enabled' %> Include table samples</label></p>
+    <div class="ai-sample-fields">
+      <p>These values become AI context for mapped projects. Choose approved columns explicitly using exact identifier case (Oracle names are commonly uppercase). Results are not written to diagnostic logs. Each value is limited to 500 characters.</p>
+      <div class="ai-sample-rows">
+        <% Array(source['sample_tables']).each_with_index do |selection, table_index| %>
+          <%= render partial: 'ai_settings/sample_table', locals: {prefix: prefix, selection: selection, table_index: table_index} %>
+        <% end %>
+      </div>
+      <button type="button" class="ai-add-sample">Add sample table</button>
+      <template class="ai-sample-template"><%= render partial: 'ai_settings/sample_table', locals: {prefix: prefix, selection: {}, table_index: '__TABLE__'} %></template>
+    </div>
+  </div>
+  <div class="ai-legacy-fields"><p>Existing explicit-file/environment-URL definition retained. Remove and add a structured source to replace it.</p></div>
+  <p><label>Revision / release label <%= text_field_tag "#{prefix}[revision]", source['revision'], placeholder: 'release or git revision', size: 50 %></label></p>
+</fieldset>

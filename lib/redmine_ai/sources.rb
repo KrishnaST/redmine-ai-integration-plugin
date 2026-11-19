@@ -2,11 +2,13 @@
 require 'digest'
 require 'pathname'
 require 'time'
+require_relative 'database_sources'
+require_relative 'folder_inventory'
 
 module RedmineAi
   class Sources
     EXTENSIONS = %w[.md .txt .rst .java .rb .py .js .ts .tsx .jsx .cs .sql .xml .xsd .html .css .properties .yml .yaml].freeze
-    BLOCKED = /(?:password|secret|credential|token|database\.yml|\.env|private.key)/i
+    BLOCKED = /(?:password|secret|credential|token|database\.yml|\.env|private.key|(?:application|bootstrap)(?:[-.][a-z0-9_-]+)?\.(?:yml|yaml|properties|json)|id_rsa|\.(?:pem|key)\z)/i
     MAX_BYTES = 2_000_000
     MAX_CONTEXT = 32_000
 
@@ -18,7 +20,13 @@ module RedmineAi
       Configuration.sources.each do |source|
         next unless source['project_ids'].include?(project_id)
         begin
-          snippets = source['type'] == 'files' ? files(source, terms, budget) : database(source, terms)
+          snippets = case source['type']
+          when 'files' then files(source, terms, budget)
+          when 'code_folder', 'documents_folder'
+            files(source.merge('files' => FolderInventory.discover(source)), terms, budget)
+          when 'database' then DatabaseSources.snippets(source, terms)
+          else database(source, terms)
+          end
           candidates.concat(snippets)
         rescue StandardError
           # No paths, credentials, connection strings or database error messages in logs/UI.
@@ -35,7 +43,7 @@ module RedmineAi
       [selected.each_with_index.map { |snippet, index| snippet.merge('id' => "S#{index + 1}") }, warnings]
     end
 
-    def self.files(source, terms, budget = {bytes: 10_000_000})
+    def self.files(source, terms, budget = {bytes: 10_000_000}, &checked)
       root = Pathname.new(source.fetch('root')).realpath
       source.fetch('files').flat_map do |relative|
         next [] if relative.match?(BLOCKED) || !EXTENSIONS.include?(File.extname(relative).downcase)
@@ -46,6 +54,7 @@ module RedmineAi
         bytes = file.binread
         next [] if bytes.include?("\x00")
         text = bytes.force_encoding('UTF-8').scrub
+        checked.call if checked
         digest = Digest::SHA256.hexdigest(bytes)
         text.lines.each_slice(40).with_index.filter_map do |chunk, index|
           content = chunk.join

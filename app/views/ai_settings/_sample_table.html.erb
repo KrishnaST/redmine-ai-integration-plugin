@@ -1,0 +1,7 @@
+<p class="ai-sample-row" data-table-index="<%= table_index %>">
+  <% name = "#{prefix}[sample_tables][#{table_index}]" %>
+  <label>Table <%= text_field_tag "#{name}[table]", selection['table'], placeholder: 'reference_codes' %></label>
+  <label>Columns <%= text_field_tag "#{name}[columns]", Array(selection['columns']).join(', '), placeholder: 'code, description', size: 35 %></label>
+  <label>Rows <%= number_field_tag "#{name}[limit]", selection['limit'] || 5, min: 1, max: 20 %></label>
+  <button type="button" class="ai-remove-sample">Remove table</button>
+</p>

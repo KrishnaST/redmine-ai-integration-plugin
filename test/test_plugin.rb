@@ -15,6 +15,9 @@ require_relative '../lib/redmine_ai/configuration'
 require_relative '../lib/redmine_ai/policy'
 require_relative '../lib/redmine_ai/sources'
 require_relative '../lib/redmine_ai/client'
+require_relative '../lib/redmine_ai/models'
+require_relative '../lib/redmine_ai/source_checks'
+require_relative '../lib/redmine_ai/settings_service'
 
 # Real Rails persistence/job machinery with small doubles for Redmine-specific interfaces.
 module Rails
@@ -28,6 +31,23 @@ end
 class Setting
   class << self
     attr_accessor :plugin_redmine_ai_integration
+    def transaction; yield; end
+    def where(*); self; end
+    def lock; self; end
+    def first!; new; end
+    def clear_cache; end
+  end
+  def value; self.class.plugin_redmine_ai_integration; end
+  def value=(value); @value = value; end
+  def save!; self.class.plugin_redmine_ai_integration = @value; end
+end
+class Project
+  def self.order(*)
+    self
+  end
+
+  def self.pluck(*)
+    [['Test project', 1]]
   end
 end
 ActiveRecord::Base.establish_connection(adapter: 'sqlite3', database: ':memory:')
@@ -48,6 +68,7 @@ class User < ApplicationRecord
     attr_accessor :current
   end
   def allowed_to?(*); permitted; end
+  def admin?; permitted; end
 end
 class Issue < ApplicationRecord
   attr_reader :journal
@@ -64,6 +85,7 @@ require_relative '../db/migrate/001_create_ai_enhancements'
 CreateAiEnhancements.new.migrate(:up)
 require_relative '../app/models/ai_enhancement'
 require_relative '../app/jobs/ai_enhancement_job'
+require_relative '../app/jobs/ai_source_check_job'
 ActiveJob::Base.logger = Logger.new(File::NULL)
 
 class PluginTest < Minitest::Test
