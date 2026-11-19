@@ -4,8 +4,9 @@ require 'action_controller'
 require 'action_dispatch/middleware/flash'
 require 'action_view'
 require 'rack/test'
-require_relative 'test_technical_sources'
+require_relative 'test_api_errors'
 require_relative 'test_database_adapters'
+require_relative 'test_technical_sources'
 class ApplicationController < ActionController::Base
   def require_login
     head :unauthorized unless User.current

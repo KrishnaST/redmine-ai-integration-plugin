@@ -2,6 +2,7 @@
 require 'json'
 require 'net/http'
 require 'uri'
+require_relative 'api_errors'
 
 module RedmineAi
   class Client
@@ -54,7 +55,7 @@ module RedmineAi
             raise Error, 'API response exceeds limit.' if size > 1_000_000
             body << chunk
           end
-          raise Error, "OpenAI request failed (HTTP #{reply.code}); check API access, model and billing." unless reply.is_a?(Net::HTTPSuccess)
+          raise Error, ApiErrors.message(reply.code, body) unless reply.is_a?(Net::HTTPSuccess)
         end
       end
       response = JSON.parse(body)

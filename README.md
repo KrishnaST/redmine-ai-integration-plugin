@@ -1,6 +1,6 @@
 # Redmine AI Integration
 
-Version 1.1.2. Source-backed automatic and interactive ticket enhancement for Redmine 7.0 / Ruby 4 / Rails 8.1.
+Version 1.1.3. Source-backed automatic and interactive ticket enhancement for Redmine 7.0 / Ruby 4 / Rails 8.1.
 
 Existing issues expose **Edit with AI** beside the normal **Edit** action (interactive questions, revisions and Apply). **Enhance with AI** below the issue details improves and saves editable textual fields automatically with a journal. Status, assignee, priority, dates and non-text workflow fields retain their values. Users need issue-edit and enhancement permissions, and the project module must be enabled.
 
@@ -67,9 +67,9 @@ The existing ActiveJob backend must process the default queue. AsyncAdapter is s
 
 ## Installation and updates
 
-Target: server 13.127.209.215, application /home/idsspl/redmine/native, service redmine-native.service. Version 1.1.2 is deployed; the initial installation and settings/action upgrades are recorded in [deployment evidence](documentation/DEPLOYMENT-2026-11-19.md).
+Target: server 13.127.209.215, application /home/idsspl/redmine/native, service redmine-native.service. Version 1.1.3 is deployed; the initial installation and subsequent upgrades are recorded in [deployment evidence](documentation/DEPLOYMENT-2026-11-19.md).
 
-Build with ruby tools/package.rb. The production archive dist/redmine_ai_integration-1.1.2.tar.gz contains only init.rb, app/, assets/, config/, db/ and lib/, under the required folder redmine_ai_integration. For a source checkout, copy those same production paths into plugins/redmine_ai_integration; do not copy the test Gemfile or development runtime.
+Build with ruby tools/package.rb. The production archive dist/redmine_ai_integration-1.1.3.tar.gz contains only init.rb, app/, assets/, config/, db/ and lib/, under the required folder redmine_ai_integration. For a source checkout, copy those same production paths into plugins/redmine_ai_integration; do not copy the test Gemfile or development runtime.
 
 Back up the existing app/database, replace the plugin's production files, run the plugin migration task from the Redmine root, publish/precompile plugin assets using the site's normal Redmine asset procedure, and restart Redmine:
 

@@ -195,10 +195,15 @@ class PluginTest < Minitest::Test
     end
   end
 
-  def with_api(body, expected_effort: nil)
-    reply = FakeReply.new(JSON.generate(body))
+  def with_api(body, expected_effort: nil, status: '200')
+    serialized = JSON.generate(body)
+    reply = Net::HTTPResponse::CODE_TO_OBJ.fetch(status).new('1.1', status, 'Test response')
+    reply.define_singleton_method(:read_body) { |&block| block.call(serialized) }
     transport = Object.new
+    requests = 0
     transport.define_singleton_method(:request) do |request, &block|
+      requests += 1
+      raise 'Unexpected automatic retry' unless requests == 1
       raise 'Missing authentication' unless request['Authorization'] == 'Bearer test-key'
       payload = JSON.parse(request.body)
       raise 'Response storage enabled' unless payload['store'] == false
@@ -228,6 +233,17 @@ class PluginTest < Minitest::Test
       assert_raises(RedmineAi::Error) do
         RedmineAi::Client.generate(fields: RedmineAi::Policy.text_fields(@issue, @user), evidence: [], messages: [], mode: 'automatic')
       end
+    end
+  end
+
+  def test_429_error_is_classified_without_retrying_or_applying
+    with_api({'error' => {'code' => 'credit_balance_exhausted', 'message' => 'synthetic-secret'}}, status: '429') do
+      error = assert_raises(RedmineAi::Error) do
+        RedmineAi::Client.generate(fields: RedmineAi::Policy.text_fields(@issue, @user), evidence: [], messages: [], mode: 'automatic')
+      end
+      assert_includes error.message, 'API credits are exhausted'
+      refute_includes error.message, 'synthetic-secret'
+      assert_equal 'payment error', @issue.reload.subject
     end
   end
 

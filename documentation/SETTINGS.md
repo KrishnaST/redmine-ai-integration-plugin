@@ -1,4 +1,4 @@
-# Settings and source setup — 1.1.1
+# Settings and source setup — 1.1.3
 
 ## Model and API key
 
