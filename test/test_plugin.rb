@@ -10,7 +10,6 @@ require 'active_support/message_encryptor'
 require 'active_support/key_generator'
 require 'tmpdir'
 require 'fileutils'
-require 'ostruct'
 require 'logger'
 require_relative '../lib/redmine_ai/configuration'
 require_relative '../lib/redmine_ai/policy'
@@ -20,7 +19,7 @@ require_relative '../lib/redmine_ai/client'
 # Real Rails persistence/job machinery with small doubles for Redmine-specific interfaces.
 module Rails
   def self.application
-    @application ||= OpenStruct.new(key_generator: ActiveSupport::KeyGenerator.new('test-only-key'))
+    @application ||= Struct.new(:key_generator).new(ActiveSupport::KeyGenerator.new('test-only-key'))
   end
   def self.logger
     @logger ||= Logger.new(File::NULL)
