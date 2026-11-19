@@ -1,4 +1,4 @@
-# Settings and source setup — 1.1.0
+# Settings and source setup — 1.1.1
 
 ## Model and API key
 
@@ -7,6 +7,23 @@ Administration → AI ticket enhancement offers a model dropdown. Save the key f
 Create a key at https://platform.openai.com/api-keys. Select the intended API project, create a secret key and copy it when first shown. Add API billing or credits at https://platform.openai.com/settings/organization/billing/overview. ChatGPT and API billing are separate. Enter the key in Redmine; do not put it in source definitions. A restricted key needs Responses write access, plus Models read access if using Refresh models.
 
 Old enhancement instructions are ignored and removed on the next settings save. The plugin uses its built-in enhancement policy.
+
+## Reasoning effort
+
+The dropdown beside Model applies to automatic enhancement and every interactive revision. It is a global plugin setting, rather than a per-ticket override.
+
+| Display label | Responses API reasoning.effort |
+|---|---|
+| Model default | Omitted (the default for existing installations) |
+| Light | low |
+| Medium | medium |
+| High | high |
+| Extra High | xhigh |
+| Ultra | max |
+
+Ultra is a display label, not an API value. Validation rejects other values before saving or making an API request. The models list does not advertise supported effort levels; choose a value documented for the selected model. A model rejecting a chosen level returns an API error and no draft is applied. There is no silent downgrade or automatic retry with another level.
+
+Higher effort can increase latency and token use. The existing 8,000-output-token budget and 90-second read timeout are unchanged. If a request exceeds those limits, the plugin fails without applying an incomplete result; choose a lower effort or less context. See [OpenAI reasoning guidance](https://developers.openai.com/api/docs/guides/reasoning).
 
 ## Source forms
 

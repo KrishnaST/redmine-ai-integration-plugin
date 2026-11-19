@@ -12,6 +12,18 @@ class TechnicalSourcesTest < Minitest::Test
      'username' => 'example', 'password' => 'synthetic-password'}
   end
 
+  def test_invalid_reasoning_effort_does_not_save_settings
+    original = Setting.plugin_redmine_ai_integration.deep_dup
+    ['ultra', 'unknown', nil, ['high']].each do |effort|
+      error = assert_raises(RedmineAi::Error) do
+        RedmineAi::SettingsService.save({'model' => 'gpt-6.2-astra', 'reasoning_effort' => effort},
+          source_rows: nil, api_key: '', clear_api_key: false)
+      end
+      assert_equal 'Choose a reasoning effort from the dropdown.', error.message
+      assert_equal original, Setting.plugin_redmine_ai_integration
+    end
+  end
+
   def test_database_password_is_encrypted_and_never_saved_in_plaintext
     sources = RedmineAi::SourceConfiguration.from_form([row], [])
     refute_includes JSON.generate(sources), 'synthetic-password'

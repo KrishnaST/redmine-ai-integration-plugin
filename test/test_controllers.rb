@@ -104,6 +104,7 @@ class ControllerTest < PluginTest
     get '/admin/ai_enhancement'
     assert_equal 200, last_response.status
     assert_includes last_response.body, '<select name="settings[model]"'
+    assert_includes last_response.body, '<select name="settings[reasoning_effort]"'
     refute_includes last_response.body, 'settings[instructions]'
     refute_includes last_response.body, 'settings[sources_json]'
     assert_includes last_response.body, 'Code folder'
@@ -138,5 +139,21 @@ class ControllerTest < PluginTest
     assert_equal 403, last_response.status
     get '/admin/ai_enhancement/reload_sources'
     assert_equal 404, last_response.status
+  end
+
+  def test_reasoning_effort_saves_renders_and_rejects_invalid_values
+    %w[low medium high xhigh max].each do |effort|
+      post '/admin/ai_enhancement', {settings: {enabled: '1', model: 'test-model', reasoning_effort: effort}}
+      assert_equal 302, last_response.status
+      assert_equal effort, RedmineAi::Configuration.values['reasoning_effort']
+    end
+    get '/admin/ai_enhancement'
+    assert_includes last_response.body, '<option selected="selected" value="max">Ultra</option>'
+    post '/admin/ai_enhancement', {settings: {enabled: '1', model: 'test-model', reasoning_effort: 'ultra'}}
+    assert_equal 200, last_response.status
+    assert_equal 'max', RedmineAi::Configuration.values['reasoning_effort']
+    post '/admin/ai_enhancement', {settings: {enabled: '1', model: 'test-model', reasoning_effort: ''}}
+    assert_equal 302, last_response.status
+    assert_nil RedmineAi::Configuration.reasoning_effort
   end
 end

@@ -1,6 +1,6 @@
 # Redmine AI Integration
 
-Version 1.1.0. Source-backed automatic and interactive ticket enhancement for Redmine 7.0 / Ruby 4 / Rails 8.1.
+Version 1.1.1. Source-backed automatic and interactive ticket enhancement for Redmine 7.0 / Ruby 4 / Rails 8.1.
 
 Existing issues expose **Enhance with AI** (improve and save editable textual fields with a journal) and **Enhance with AI Interactively** (questions, revisions and Apply). Status, assignee, priority, dates and non-text workflow fields retain their values. Users need issue-edit and enhancement permissions, and the project module must be enabled.
 
@@ -12,6 +12,7 @@ Open **Administration → AI ticket enhancement**.
 
 1. Enter the OpenAI API key and save. Blank retains the encrypted key; Remove saved key clears it.
 2. Select a **Model** from the dropdown. **Refresh models** retrieves text-model IDs available to the saved key; use a model supporting Responses and structured output. The default choices are GPT-6.2 Astra, GPT-6.2 Sol, GPT-6.1 Terra and GPT-6 Luna. A stored older model remains selectable.
+   Select **Reasoning effort** beside the model: Model default, Light, Medium, High, Extra High or Ultra. Model default omits the API parameter and preserves existing behavior. Other levels map to low, medium, high, xhigh and max; supported levels depend on the model. Higher effort may increase token usage and processing time.
 3. Add **Code folder**, **Documents folder** or **Database** sources with the structured controls. No raw JSON or enhancement-instructions field is shown.
 4. Assign each source to specific projects. These mappings grant enhancement users in those projects access to retrieved excerpts, including approved table samples.
 5. Save, then click **Test/reload sources**. This checks current files, schema metadata and opted-in samples in a background job without calling OpenAI. Results show success/failure and counts. Refresh the page for completion.
@@ -64,9 +65,9 @@ The existing ActiveJob backend must process the default queue. AsyncAdapter is s
 
 ## Installation and updates
 
-Target: server 13.127.209.215, application /home/idsspl/redmine/native, service redmine-native.service. Version 1.1.0 is deployed; the initial installation and structured-settings upgrade are recorded in [deployment evidence](documentation/DEPLOYMENT-2026-11-19.md).
+Target: server 13.127.209.215, application /home/idsspl/redmine/native, service redmine-native.service. Version 1.1.1 is deployed; the initial installation and settings upgrades are recorded in [deployment evidence](documentation/DEPLOYMENT-2026-11-19.md).
 
-Build with ruby tools/package.rb. The production archive dist/redmine_ai_integration-1.1.0.tar.gz contains only init.rb, app/, assets/, config/, db/ and lib/, under the required folder redmine_ai_integration. For a source checkout, copy those same production paths into plugins/redmine_ai_integration; do not copy the test Gemfile or development runtime.
+Build with ruby tools/package.rb. The production archive dist/redmine_ai_integration-1.1.1.tar.gz contains only init.rb, app/, assets/, config/, db/ and lib/, under the required folder redmine_ai_integration. For a source checkout, copy those same production paths into plugins/redmine_ai_integration; do not copy the test Gemfile or development runtime.
 
 Back up the existing app/database, replace the plugin's production files, run the plugin migration task from the Redmine root, publish/precompile plugin assets using the site's normal Redmine asset procedure, and restart Redmine:
 

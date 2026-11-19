@@ -6,6 +6,7 @@ module RedmineAi
     def self.save(values, source_rows:, api_key:, clear_api_key:)
       current = Configuration.values
       raise Error, 'Choose a model from the dropdown; refresh available models if needed.' unless Models.options.include?(values['model'])
+      Configuration.reasoning_effort(values.fetch('reasoning_effort', current['reasoning_effort']))
       sources = source_rows.nil? ? Configuration.sources : SourceConfiguration.from_form(source_rows, Configuration.sources)
       values = values.merge('sources_json' => JSON.generate(sources))
       raise Error, 'Technical source configuration exceeds 100 KB.' if values['sources_json'].bytesize > 100_000

@@ -37,11 +37,14 @@ module RedmineAi
       request = Net::HTTP::Post.new(ENDPOINT)
       request['Authorization'] = "Bearer #{key}"
       request['Content-Type'] = 'application/json'
-      request.body = JSON.generate(model: Configuration.values.fetch('model'), store: false,
+      payload = {model: Configuration.values.fetch('model'), store: false,
         max_output_tokens: 8000,
         input: [{role: 'system', content: SYSTEM},
                 {role: 'user', content: JSON.generate(mode: mode, ticket_fields: fields, evidence: evidence, conversation: messages)}],
-        text: {format: {type: 'json_schema', name: 'ticket_enhancement', strict: true, schema: schema}})
+        text: {format: {type: 'json_schema', name: 'ticket_enhancement', strict: true, schema: schema}}}
+      effort = Configuration.reasoning_effort
+      payload[:reasoning] = {effort: effort} if effort
+      request.body = JSON.generate(payload)
       body = +''
       Net::HTTP.start(ENDPOINT.host, ENDPOINT.port, use_ssl: true, open_timeout: 10, read_timeout: 90, write_timeout: 15) do |http|
         http.request(request) do |reply|

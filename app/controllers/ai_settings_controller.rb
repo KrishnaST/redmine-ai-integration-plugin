@@ -8,7 +8,7 @@ class AiSettingsController < ApplicationController
 
   def update
     current = RedmineAi::Configuration.values
-    values = params.require(:settings).permit(:enabled, :model).to_h
+    values = params.require(:settings).permit(:enabled, :model, :reasoning_effort).to_h
     RedmineAi::SettingsService.save(values, source_rows: params[:sources_present] == '1' ? source_rows : nil,
       api_key: params[:api_key], clear_api_key: params[:clear_api_key] == '1')
     flash[:notice] = 'AI settings saved.'

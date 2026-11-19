@@ -4,13 +4,13 @@ gem 'minitest', '~> 5.0'
 ENV['MT_NO_PLUGINS'] = '1'
 require 'minitest/autorun'
 require 'minitest/mock'
-require 'active_record'
 require 'active_job'
+require 'active_record'
 require 'active_support/message_encryptor'
 require 'active_support/key_generator'
-require 'tmpdir'
 require 'fileutils'
 require 'logger'
+require 'tmpdir'
 require_relative '../lib/redmine_ai/configuration'
 require_relative '../lib/redmine_ai/policy'
 require_relative '../lib/redmine_ai/sources'
@@ -195,7 +195,7 @@ class PluginTest < Minitest::Test
     end
   end
 
-  def with_api(body)
+  def with_api(body, expected_effort: nil)
     reply = FakeReply.new(JSON.generate(body))
     transport = Object.new
     transport.define_singleton_method(:request) do |request, &block|
@@ -203,6 +203,11 @@ class PluginTest < Minitest::Test
       payload = JSON.parse(request.body)
       raise 'Response storage enabled' unless payload['store'] == false
       raise 'No strict schema' unless payload.dig('text', 'format', 'strict')
+      if expected_effort
+        raise 'Wrong reasoning effort' unless payload['reasoning'] == {'effort' => expected_effort}
+      else
+        raise 'Default reasoning overridden' if payload.key?('reasoning')
+      end
       block.call(reply)
       reply # Net::HTTP returns the response, not the block value.
     end
@@ -220,6 +225,33 @@ class PluginTest < Minitest::Test
 
   def test_incomplete_api_response_does_not_apply
     with_api({'status' => 'incomplete', 'output' => []}) do
+      assert_raises(RedmineAi::Error) do
+        RedmineAi::Client.generate(fields: RedmineAi::Policy.text_fields(@issue, @user), evidence: [], messages: [], mode: 'automatic')
+      end
+    end
+  end
+
+  def test_selected_reasoning_effort_is_sent_for_both_modes
+    body = {'status' => 'completed', 'output' => [{'content' => [{'type' => 'output_text', 'text' => JSON.generate(result)}]}]}
+    %w[low medium high xhigh max].each do |effort|
+      Setting.plugin_redmine_ai_integration['reasoning_effort'] = effort
+      %w[automatic interactive].each do |mode|
+        with_api(body, expected_effort: effort) do
+          assert_equal result, RedmineAi::Client.generate(fields: RedmineAi::Policy.text_fields(@issue, @user), evidence: [], messages: [], mode: mode)
+        end
+      end
+    end
+  end
+
+  def test_explicit_model_default_omits_reasoning
+    Setting.plugin_redmine_ai_integration['reasoning_effort'] = ''
+    test_actual_http_response_contract_and_structured_output
+  end
+
+  def test_invalid_saved_reasoning_is_rejected_before_network_request
+    Setting.plugin_redmine_ai_integration['reasoning_effort'] = 'ultra'
+    Setting.plugin_redmine_ai_integration['api_key_encrypted'] = RedmineAi::Configuration.encryptor.encrypt_and_sign('test-key')
+    Net::HTTP.stub(:start, ->(*) { flunk 'Invalid effort must not reach OpenAI' }) do
       assert_raises(RedmineAi::Error) do
         RedmineAi::Client.generate(fields: RedmineAi::Policy.text_fields(@issue, @user), evidence: [], messages: [], mode: 'automatic')
       end

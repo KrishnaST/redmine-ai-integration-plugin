@@ -35,7 +35,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Deployment helper tests failed.' }
     & $rubyExecutable tools\package.rb
     if ($LASTEXITCODE -ne 0) { throw 'Packaging failed.' }
-    & $rubyExecutable -r rubygems/package -r zlib -e 'Zlib::GzipReader.open(ARGV[0]) { |gzip| Gem::Package::TarReader.new(gzip) { |tar| names = tar.map(&:full_name); abort "Unsafe archive entry" unless names.all? { |name| name.start_with?("redmine_ai_integration/") && !name.include?("..") }; abort "Missing JavaScript asset" unless names.include?("redmine_ai_integration/assets/javascripts/settings.js"); puts "Verified #{names.size} production archive entries" } }' dist\redmine_ai_integration-1.1.0.tar.gz
+    & $rubyExecutable -r rubygems/package -r zlib -e 'Zlib::GzipReader.open(ARGV[0]) { |gzip| Gem::Package::TarReader.new(gzip) { |tar| names = tar.map(&:full_name); abort "Unsafe archive entry" unless names.all? { |name| name.start_with?("redmine_ai_integration/") && !name.include?("..") }; abort "Missing JavaScript asset" unless names.include?("redmine_ai_integration/assets/javascripts/settings.js"); puts "Verified #{names.size} production archive entries" } }' dist\redmine_ai_integration-1.1.1.tar.gz
     if ($LASTEXITCODE -ne 0) { throw 'Archive verification failed.' }
     git diff --check
     if ($LASTEXITCODE -ne 0) { throw 'Whitespace verification failed.' }

@@ -24,6 +24,8 @@ ActiveRecord::Base.transaction(requires_new: true) do
       assigns: {settings: configuration, sources: [], models: RedmineAi::Models.options,
                 projects: Project.order(:name).pluck(:name, :id), source_check: configuration['source_check'] || {}})
     raise 'Model dropdown was not rendered' unless rendered.include?('name="settings[model]"') && rendered.include?('<select')
+    raise 'Reasoning effort dropdown was not rendered' unless rendered.include?('name="settings[reasoning_effort]"') && rendered.include?('value="max">Ultra</option>')
+    information[:reasoning_effort] = configuration['reasoning_effort'].presence || 'model_default'
     raise 'Structured sources were not rendered' unless rendered.include?('IP / hostname') && rendered.include?('Include table samples') && rendered.include?('Test/reload sources')
     raise 'Obsolete controls still rendered' if rendered.include?('settings[instructions]') || rendered.include?('settings[sources_json]')
     information[:settings_rendered] = true
