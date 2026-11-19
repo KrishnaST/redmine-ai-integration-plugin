@@ -31,11 +31,15 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'JavaScript syntax failed.' }
     node test\test_settings_js.cjs
     if ($LASTEXITCODE -ne 0) { throw 'Dynamic form tests failed.' }
+    node --check assets\javascripts\issue_actions.js
+    if ($LASTEXITCODE -ne 0) { throw 'Issue action JavaScript syntax failed.' }
+    node test\test_issue_actions_js.cjs
+    if ($LASTEXITCODE -ne 0) { throw 'Issue action placement tests failed.' }
     python -m unittest discover -s test -p test_deployment_environment.py
     if ($LASTEXITCODE -ne 0) { throw 'Deployment helper tests failed.' }
     & $rubyExecutable tools\package.rb
     if ($LASTEXITCODE -ne 0) { throw 'Packaging failed.' }
-    & $rubyExecutable -r rubygems/package -r zlib -e 'Zlib::GzipReader.open(ARGV[0]) { |gzip| Gem::Package::TarReader.new(gzip) { |tar| names = tar.map(&:full_name); abort "Unsafe archive entry" unless names.all? { |name| name.start_with?("redmine_ai_integration/") && !name.include?("..") }; abort "Missing JavaScript asset" unless names.include?("redmine_ai_integration/assets/javascripts/settings.js"); puts "Verified #{names.size} production archive entries" } }' dist\redmine_ai_integration-1.1.1.tar.gz
+    & $rubyExecutable -r rubygems/package -r zlib -e 'Zlib::GzipReader.open(ARGV[0]) { |gzip| Gem::Package::TarReader.new(gzip) { |tar| names = tar.map(&:full_name); abort "Unsafe archive entry" unless names.all? { |name| name.start_with?("redmine_ai_integration/") && !name.include?("..") }; abort "Missing JavaScript asset" unless names.include?("redmine_ai_integration/assets/javascripts/settings.js"); puts "Verified #{names.size} production archive entries" } }' dist\redmine_ai_integration-1.1.2.tar.gz
     if ($LASTEXITCODE -ne 0) { throw 'Archive verification failed.' }
     git diff --check
     if ($LASTEXITCODE -ne 0) { throw 'Whitespace verification failed.' }

@@ -1,6 +1,6 @@
 # Operations
 
-Plugin 1.1.1 is deployed to server 215 as of 19 November 2026. Verified stack: Redmine 7.0.2.stable / Ruby 4.0.9 / Rails 8.1.4 / PostgreSQL 18.7. All four source drivers load, the structured settings page renders, and its JavaScript is served. The existing async backend is unchanged. At the latest upgrade, enhancement was enabled with a saved API key and zero sources; these settings were preserved. Reasoning effort defaults to Model default. Review the [deployment record](DEPLOYMENT-2026-11-19.md) and reverify versions before future deployments.
+Plugin 1.1.2 is deployed to server 215 as of 19 November 2026. Verified stack: Redmine 7.0.2.stable / Ruby 4.0.9 / Rails 8.1.4 / PostgreSQL 18.7. All four source drivers load, the structured settings page renders, and its JavaScript is served. The existing async backend is unchanged. Enhancement is enabled with a saved API key and zero sources. Reasoning effort defaults to Model default. At the user's explicit request, the AI module is enabled in all 34 active projects and the AI permission in all five signed-in roles; Anonymous is excluded and existing issue visibility/edit requirements remain. Review the [deployment record](DEPLOYMENT-2026-11-19.md) and reverify versions before future deployments.
 
 ## Endpoints
 

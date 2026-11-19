@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 require_relative 'test_plugin'
 require 'action_controller'
-require 'action_view'
 require 'action_dispatch/middleware/flash'
+require 'action_view'
 require 'rack/test'
 require_relative 'test_technical_sources'
 require_relative 'test_database_adapters'
@@ -22,6 +22,7 @@ require_relative '../app/controllers/ai_settings_controller'
 ROUTES = ActionDispatch::Routing::RouteSet.new
 ROUTES.draw do
   get 'issues/:id', to: 'issues#show', as: :issue
+  get 'issues/:id/edit', to: 'issues#edit', as: :edit_issue
   instance_eval(File.read(File.expand_path('../config/routes.rb', __dir__)))
 end
 AiEnhancementsController.include ROUTES.url_helpers
@@ -43,6 +44,44 @@ class ControllerTest < PluginTest
       assert_equal 302, last_response.status
       assert_equal 'interactive', AiEnhancement.last.mode
     end
+  end
+
+  def test_issue_actions_render_interactive_post_link_with_edit_target
+    rendered = AiEnhancementsController.renderer.render(partial: 'ai_enhancements/buttons', locals: {issue: @issue})
+    assert_includes rendered, '>Edit with AI</a>'
+    assert_includes rendered, "data-edit-path=\"/issues/#{@issue.id}/edit\""
+    assert_includes rendered, 'mode=interactive'
+    assert_includes rendered, 'data-method="post"'
+    assert_includes rendered, 'data-ai-edit-action="true"'
+    assert_includes rendered, 'issue_actions.js'
+    assert_includes rendered, '>Enhance with AI</a>'
+    FileUtils.mkdir_p(File.expand_path('../tmp', __dir__))
+    File.write(File.expand_path('../tmp/issue-actions.html', __dir__), rendered)
+  end
+
+  def test_issue_actions_hidden_when_disabled_or_not_allowed
+    Setting.plugin_redmine_ai_integration['enabled'] = '0'
+    rendered = AiEnhancementsController.renderer.render(partial: 'ai_enhancements/buttons', locals: {issue: @issue})
+    refute_includes rendered, 'Edit with AI'
+    Setting.plugin_redmine_ai_integration['enabled'] = '1'
+    @user.update!(permitted: false)
+    rendered = AiEnhancementsController.renderer.render(partial: 'ai_enhancements/buttons', locals: {issue: @issue})
+    refute_includes rendered, 'Edit with AI'
+    User.current = nil
+    rendered = AiEnhancementsController.renderer.render(partial: 'ai_enhancements/buttons', locals: {issue: @issue})
+    refute_includes rendered, 'Edit with AI'
+  end
+
+  def test_ai_permission_does_not_bypass_existing_edit_access_or_login
+    @user.define_singleton_method(:allowed_to?) { |permission, *_arguments| permission == :enhance_issues_with_ai }
+    rendered = AiEnhancementsController.renderer.render(partial: 'ai_enhancements/buttons', locals: {issue: @issue})
+    refute_includes rendered, 'Edit with AI'
+    post "/issues/#{@issue.id}/ai_enhancements", {mode: 'interactive'}
+    assert_equal 403, last_response.status
+    User.current = nil
+    post "/issues/#{@issue.id}/ai_enhancements", {mode: 'interactive'}
+    assert_equal 401, last_response.status
+    assert_equal 0, AiEnhancement.count
   end
 
   def test_non_owner_cannot_view_or_reply

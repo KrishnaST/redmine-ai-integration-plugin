@@ -1,8 +1,8 @@
 # Redmine AI Integration
 
-Version 1.1.1. Source-backed automatic and interactive ticket enhancement for Redmine 7.0 / Ruby 4 / Rails 8.1.
+Version 1.1.2. Source-backed automatic and interactive ticket enhancement for Redmine 7.0 / Ruby 4 / Rails 8.1.
 
-Existing issues expose **Enhance with AI** (improve and save editable textual fields with a journal) and **Enhance with AI Interactively** (questions, revisions and Apply). Status, assignee, priority, dates and non-text workflow fields retain their values. Users need issue-edit and enhancement permissions, and the project module must be enabled.
+Existing issues expose **Edit with AI** beside the normal **Edit** action (interactive questions, revisions and Apply). **Enhance with AI** below the issue details improves and saves editable textual fields automatically with a journal. Status, assignee, priority, dates and non-text workflow fields retain their values. Users need issue-edit and enhancement permissions, and the project module must be enabled.
 
 The plugin calls OpenAI directly from Ruby using the existing ActiveJob default queue. There is no separate AI service.
 
@@ -19,6 +19,8 @@ Open **Administration → AI ticket enhancement**.
 6. Enable the integration. In each participating project enable **Redmine AI Integration**, then grant the role **Enhance issues with AI** alongside **Edit issues**.
 
 There is no scan at Redmine startup. Enhancement requests read the current sources; Test/reload verifies them rather than building a semantic/vector index. Changed source configuration invalidates previous check results.
+
+If the buttons are absent, enable **Redmine AI Integration** under the project's **Settings → Modules** and grant **Enhance issues with AI** plus **Edit issues** to the appropriate member roles under **Administration → Roles and permissions**. The global Enabled setting alone does not grant project access. The issue toolbar action is placed by the plugin's own JavaScript; without JavaScript, Edit with AI remains below the issue details. Redmine core views are unchanged.
 
 ### API key
 
@@ -65,9 +67,9 @@ The existing ActiveJob backend must process the default queue. AsyncAdapter is s
 
 ## Installation and updates
 
-Target: server 13.127.209.215, application /home/idsspl/redmine/native, service redmine-native.service. Version 1.1.1 is deployed; the initial installation and settings upgrades are recorded in [deployment evidence](documentation/DEPLOYMENT-2026-11-19.md).
+Target: server 13.127.209.215, application /home/idsspl/redmine/native, service redmine-native.service. Version 1.1.2 is deployed; the initial installation and settings/action upgrades are recorded in [deployment evidence](documentation/DEPLOYMENT-2026-11-19.md).
 
-Build with ruby tools/package.rb. The production archive dist/redmine_ai_integration-1.1.1.tar.gz contains only init.rb, app/, assets/, config/, db/ and lib/, under the required folder redmine_ai_integration. For a source checkout, copy those same production paths into plugins/redmine_ai_integration; do not copy the test Gemfile or development runtime.
+Build with ruby tools/package.rb. The production archive dist/redmine_ai_integration-1.1.2.tar.gz contains only init.rb, app/, assets/, config/, db/ and lib/, under the required folder redmine_ai_integration. For a source checkout, copy those same production paths into plugins/redmine_ai_integration; do not copy the test Gemfile or development runtime.
 
 Back up the existing app/database, replace the plugin's production files, run the plugin migration task from the Redmine root, publish/precompile plugin assets using the site's normal Redmine asset procedure, and restart Redmine:
 

@@ -54,3 +54,13 @@ Deployed on 19 November 2026. The native configuration view renders the reasonin
 Package SHA-256: `13acbc2186c2bf813acfa2577f2e6650ffae06515fb88197d064fbc9abdc94f8`. Private rollback material, migration/asset logs and native verification are under `/home/idsspl/redmine/ai-integration-deployment/settings-upgrade-20261119T083815Z/`.
 
 By this upgrade the operator had saved an API key and enabled the integration. Both settings were preserved, along with project access and zero configured sources. All four driver versions remain unchanged. No additional database migration was needed and no live ticket or OpenAI request was used for verification. Local checks passed 65 Ruby tests / 332 assertions, 13 JavaScript assertions and four deployment-helper tests.
+
+## Edit with AI action upgrade to 1.1.2
+
+Deployed on 19 November 2026, with rollback material and native verification under `/home/idsspl/redmine/ai-integration-deployment/settings-upgrade-20261119T084707Z/`. Package SHA-256: `4ef2953b4c237c7a4cab6dd67bd3317759756fe6932c2d112073b7d5cad3df22`.
+
+The interactive action is named Edit with AI and is placed immediately after the normal Edit link by the plugin's own issue_actions asset. Automatic Enhance with AI remains below the issue details. No Redmine core view is overwritten; a missing toolbar or disabled JavaScript leaves the interactive link below the details. The link keeps its interactive POST behavior and original authorization.
+
+Read-only inspection found zero projects/roles enabled for AI, explaining the hidden buttons. The user then explicitly requested access for all users. A separate authorized transaction enabled the AI module in all **34 active projects** and added only the AI permission to all **five signed-in roles**, including Non member. Anonymous was excluded. The permission registration now allows signed-in users, while the policy still requires existing issue visibility/edit access. No issue-edit privileges, memberships or issue records were changed. A private pre-change role/module inventory is in `ai-access-before.json` in that rollback directory. Future projects/roles are not automatically enrolled.
+
+The service restarted successfully, and local/public login and the fingerprinted issue-action asset returned HTTP 200. Native rendering after the access change verified the interactive POST action on an actual permitted issue in a read-only transaction. Local checks passed **68 Ruby tests / 357 assertions**, **13 settings-form assertions**, **nine issue-action DOM assertions** and **four deployment-helper tests**. No paid OpenAI request was used for verification.

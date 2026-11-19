@@ -25,6 +25,14 @@ Ultra is a display label, not an API value. Validation rejects other values befo
 
 Higher effort can increase latency and token use. The existing 8,000-output-token budget and 90-second read timeout are unchanged. If a request exceeds those limits, the plugin fails without applying an incomplete result; choose a lower effort or less context. See [OpenAI reasoning guidance](https://developers.openai.com/api/docs/guides/reasoning).
 
+## Issue action visibility
+
+On an existing issue, **Edit with AI** appears directly after the native Edit action and starts interactive enhancement. Automatic **Enhance with AI** remains below the issue details. Both use POST with the existing authorization and CSRF controls. Page loading alone never submits an enhancement.
+
+The global Enabled setting, the project's Redmine AI Integration module, issue visibility/edit access, and the user's Enhance issues with AI / Edit issues permissions are required. Enable the module in Project Settings → Modules and select the roles in Administration → Roles and permissions. The AI permission can also be granted to the authenticated Non member role; it never grants Edit issues or visibility by itself. Anonymous access is excluded. Installation does not grant these permissions automatically.
+
+The plugin renders permission-checked actions through Redmine's issue-details hook and moves the interactive link beside Edit using its own asset. No core template is overridden. If JavaScript is unavailable or the theme has no matching Edit toolbar link, the interactive action stays below the details.
+
 ## Source forms
 
 Add a named source, select Code folder / Documents folder / Database and assign one or more projects. Fields appear for the chosen type. A mapping authorizes enhancement users in those projects to receive retrieved context. Removing a row and saving removes the source; it does not delete server files or databases.

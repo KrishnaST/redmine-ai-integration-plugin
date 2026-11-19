@@ -1,7 +1,7 @@
 <% if RedmineAi::Configuration.values['enabled'] == '1' && RedmineAi::Policy.allowed?(issue, User.current) %>
-  <div class="ai-enhancement-actions">
+  <%= javascript_include_tag 'issue_actions', plugin: 'redmine_ai_integration', defer: true %>
+  <div class="ai-enhancement-actions" data-edit-path="<%= edit_issue_path(issue) %>">
     <%= link_to 'Enhance with AI', issue_ai_enhancements_path(issue, mode: 'automatic'), method: :post, class: 'icon icon-edit' %>
-    &nbsp; | &nbsp;
-    <%= link_to 'Enhance with AI Interactively', issue_ai_enhancements_path(issue, mode: 'interactive'), method: :post, class: 'icon icon-comment' %>
+    <%= link_to 'Edit with AI', issue_ai_enhancements_path(issue, mode: 'interactive'), method: :post, class: 'icon icon-edit ai-edit-with-ai', data: {ai_edit_action: true} %>
   </div>
 <% end %>
