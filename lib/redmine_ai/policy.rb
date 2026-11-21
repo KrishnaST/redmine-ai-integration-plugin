@@ -15,6 +15,13 @@ module RedmineAi
       Digest::SHA256.hexdigest(JSON.generate([issue.attributes.sort, issue.custom_field_values.map { |field| [field.custom_field_id, field.value] }]))
     end
 
+    def self.code_allowed?(issue, user)
+      return false unless allowed?(issue, user)
+      return true if user.admin?
+      selected = Array(Configuration.values['code_role_ids'])
+      user.roles_for_project(issue.project).any? { |role| selected.include?(role.id) }
+    end
+
     def self.text_fields(issue, user)
       editable = issue.safe_attribute_names(user)
       fields = {}

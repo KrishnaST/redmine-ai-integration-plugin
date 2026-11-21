@@ -8,6 +8,8 @@
   <p><label>Projects <%= select_tag "#{prefix}[project_ids][]", options_for_select(@projects, source['project_ids']), multiple: true, size: 4, required: true %></label></p>
   <div class="ai-folder-fields">
     <p><label>Server folder path <%= text_field_tag "#{prefix}[root]", source['root'], size: 70, placeholder: '/srv/approved-source' %></label></p>
+    <p><label><%= check_box_tag "#{prefix}[allow_code_changes]", '1', source['allow_code_changes'] == true %> Allow reviewed code changes (Code folder only)</label><br>
+      Use a dedicated editable source checkout. Apply can replace reviewed existing source files here; Redmine/system directories and excluded files are blocked. No automatic build, commit or deployment.</p>
     <p>Subfolders are included. Hidden directories, dependencies/build outputs, credential-related files and symlinks are excluded. Maximum 500 eligible files per folder.</p>
   </div>
   <div class="ai-database-fields">

@@ -8,7 +8,11 @@
             const edit = Array.from(document.querySelectorAll('.contextual a.icon-edit')).find(function (link) {
                 return new URL(link.href, document.baseURI).pathname === actions.dataset.editPath;
             });
-            if (edit) { edit.after(action); }
+            const codeAction = actions.querySelector('[data-ai-code-action]');
+            if (edit) {
+                edit.after(action);
+                if (codeAction) { action.after(codeAction); }
+            }
         });
     }
 

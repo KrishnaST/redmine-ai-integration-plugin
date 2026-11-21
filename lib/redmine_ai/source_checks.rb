@@ -20,6 +20,10 @@ module RedmineAi
             raise Error, 'Connected, but no table columns are visible. Check the schema/owner and metadata access.' if tables.empty?
             result.merge!('status' => 'ok', 'message' => "#{tables.size} tables; #{tables.sum { |table| table['columns'].size }} columns; #{tables.sum { |table| table['sample_rows'].size }} approved sample rows checked.")
           else
+            if source['type'] == 'code_folder' && source['allow_code_changes'] == true
+              code_root = CodeFiles.root(source)
+              raise Error, 'Reviewed code folder is not writable by Redmine.' unless code_root.writable?
+            end
             files = source['type'] == 'files' ? source['files'] : FolderInventory.discover(source)
             raise Error, 'No eligible text/code files were found.' if files.empty?
             readable = 0

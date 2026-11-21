@@ -8,7 +8,7 @@ ENVIRONMENT_FILE="${4:?Existing service environment file required}"
 EXPECTED_SHA256="${5:?Reviewed package SHA256 required}"
 HEALTH_URL="${6:-http://127.0.0.1:3000/login}"
 PG_DUMP="${7:-pg_dump}"
-PACKAGE="$STAGING/redmine_ai_integration-1.2.0.tar.gz"
+PACKAGE="$STAGING/redmine_ai_integration-1.3.0.tar.gz"
 PLUGIN="$APPLICATION/plugins/redmine_ai_integration"
 RUN="$STAGING/settings-upgrade-$(date -u +%Y%m%dT%H%M%SZ)"
 STOPPED=0
@@ -49,6 +49,7 @@ bundle exec rake assets:precompile > "$RUN/assets.log" 2>&1
 bundle exec rails runner "$STAGING/verify_settings.rb" > "$RUN/verification.json" 2> "$RUN/verification-errors.log"
 bundle exec rails runner "$STAGING/verify_issue_actions.rb" > "$RUN/issue-actions-verification.json" 2> "$RUN/issue-actions-errors.log"
 bundle exec rails runner "$STAGING/verify_artifacts.rb" "$STAGING/diagram-fixture.json" > "$RUN/artifacts-verification.json" 2> "$RUN/artifacts-errors.log"
+bundle exec rails runner "$STAGING/verify_code.rb" > "$RUN/code-verification.json" 2> "$RUN/code-errors.log"
 sudo -n systemctl start "$SERVICE"
 STOPPED=0
 healthy=0
@@ -63,3 +64,4 @@ printf 'Settings upgrade completed. Evidence: %s\n' "$RUN"
 cat "$RUN/verification.json"
 cat "$RUN/issue-actions-verification.json"
 cat "$RUN/artifacts-verification.json"
+cat "$RUN/code-verification.json"

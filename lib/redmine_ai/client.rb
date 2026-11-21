@@ -32,8 +32,6 @@ module RedmineAi
     TEXT
 
     def self.generate(fields:, evidence:, messages:, mode:)
-      key = Configuration.secret
-      raise Error, 'Configure an OpenAI API key in Administration.' if key.to_s.empty?
       schema = {
         type: 'object', additionalProperties: false,
         properties: {
@@ -43,13 +41,24 @@ module RedmineAi
           source_ids: {type: 'array', items: {type: 'string'}}, attachments: Artifacts.schema
         }, required: %w[fields questions source_ids attachments]
       }
+      result = respond(schema: schema, system: SYSTEM, input: {mode: mode, ticket_fields: fields, evidence: evidence, conversation: messages})
+      result = Policy.validate!(result, fields, evidence.map { |source| source['id'] })
+      raise Error, 'Automatic enhancement unexpectedly requested interaction.' if mode == 'automatic' && result['questions'].any?
+      raise Error, 'Attachments require interactive preview and Apply.' if mode == 'automatic' && result.fetch('attachments', []).any?
+      result
+    end
+
+    def self.respond(schema:, system:, input:, max_output_tokens: 8000)
+      raise Error, 'AI context is too large. Start a new draft with less information.' if JSON.generate(input).bytesize > 400_000
+      key = Configuration.secret
+      raise Error, 'Configure an OpenAI API key in Administration.' if key.to_s.empty?
       request = Net::HTTP::Post.new(ENDPOINT)
       request['Authorization'] = "Bearer #{key}"
       request['Content-Type'] = 'application/json'
       payload = {model: Configuration.values.fetch('model'), store: false,
-        max_output_tokens: 8000,
-        input: [{role: 'system', content: SYSTEM},
-                {role: 'user', content: JSON.generate(mode: mode, ticket_fields: fields, evidence: evidence, conversation: messages)}],
+        max_output_tokens: max_output_tokens,
+        input: [{role: 'system', content: system},
+                {role: 'user', content: JSON.generate(input)}],
         text: {format: {type: 'json_schema', name: 'ticket_enhancement', strict: true, schema: schema}}}
       effort = Configuration.reasoning_effort
       payload[:reasoning] = {effort: effort} if effort
@@ -70,10 +79,7 @@ module RedmineAi
       raise Error, 'OpenAI did not complete the draft; retry with less context.' unless response['status'] == 'completed'
       text = Array(response['output']).flat_map { |item| Array(item['content']) }
                 .select { |item| item['type'] == 'output_text' }.map { |item| item['text'] }.join
-      result = Policy.validate!(JSON.parse(text), fields, evidence.map { |source| source['id'] })
-      raise Error, 'Automatic enhancement unexpectedly requested interaction.' if mode == 'automatic' && result['questions'].any?
-      raise Error, 'Attachments require interactive preview and Apply.' if mode == 'automatic' && result.fetch('attachments', []).any?
-      result
+      JSON.parse(text)
     rescue JSON::ParserError
       raise Error, 'OpenAI returned an invalid or refused draft.'
     end

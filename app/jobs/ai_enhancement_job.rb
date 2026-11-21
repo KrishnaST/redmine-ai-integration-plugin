@@ -1,4 +1,6 @@
 # frozen_string_literal: true
+require_relative '../../lib/redmine_ai/code_draft'
+
 class AiEnhancementJob < ActiveJob::Base
   queue_as :default
 
@@ -15,13 +17,21 @@ class AiEnhancementJob < ActiveJob::Base
     end
     raise RedmineAi::Error, 'AI enhancement is disabled.' unless RedmineAi::Configuration.values['enabled'] == '1'
     raise RedmineAi::Error, 'Permission to enhance this ticket was revoked.' unless RedmineAi::Policy.allowed?(enhancement.issue, user)
+    raise RedmineAi::Error, 'Permission to use Code with AI was revoked.' if enhancement.mode == 'code' && !RedmineAi::Policy.code_allowed?(enhancement.issue, user)
     document = enhancement.data
     fields = RedmineAi::Policy.text_fields(enhancement.issue, user)
     raise RedmineAi::Error, 'No editable text fields.' if fields.empty?
     query = (fields.values + document['messages'].map { |message| message['text'] }).join(' ')[0, 40_000]
     sources, warnings = RedmineAi::Sources.collect(enhancement.issue.project_id, query)
-    result = RedmineAi::Client.generate(fields: fields, evidence: sources, messages: document['messages'], mode: enhancement.mode)
-    document.merge!('result' => result, 'sources' => sources.map { |source| source.except('content') }, 'warnings' => warnings)
+    if enhancement.mode == 'code'
+      files = RedmineAi::CodeFiles.collect(enhancement.issue.project_id, query)
+      result = RedmineAi::CodeDraft.generate(fields: fields, evidence: sources, messages: document['messages'], files: files)
+      document.merge!('code_result' => result, 'code_files' => files)
+    else
+      result = RedmineAi::Client.generate(fields: fields, evidence: sources, messages: document['messages'], mode: enhancement.mode)
+      document['result'] = result
+    end
+    document.merge!('sources' => sources.map { |source| source.except('content') }, 'warnings' => warnings)
     enhancement.with_lock do
       enhancement.data = document
       enhancement.state = 'draft'

@@ -4,8 +4,8 @@ require_relative '../../lib/redmine_ai/attachment_service'
 class AiEnhancement < ApplicationRecord
   belongs_to :issue
   belongs_to :user
-  validates :mode, inclusion: {in: %w[automatic interactive]}
-  validates :state, inclusion: {in: %w[queued processing draft applied failed conflict]}
+  validates :mode, inclusion: {in: %w[automatic interactive code]}
+  validates :state, inclusion: {in: %w[queued processing draft applying applied failed conflict]}
 
   def data
     RedmineAi::Configuration.encryptor.decrypt_and_verify(payload)
@@ -16,6 +16,7 @@ class AiEnhancement < ApplicationRecord
   end
 
   def apply_draft!
+    raise RedmineAi::Error, 'Code proposals must use Apply code changes.' if mode == 'code'
     with_lock do
       raise RedmineAi::Error, 'Draft is not ready.' unless state == 'draft'
       issue.with_lock do

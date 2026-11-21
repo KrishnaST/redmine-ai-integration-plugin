@@ -23,6 +23,9 @@ module RedmineAi
         raise Error, 'Select at least one project for each source.' unless ids.is_a?(Array) && ids.any? && ids.all? { |id| id.is_a?(Integer) && id.positive? }
         case source['type']
         when 'files', 'code_folder', 'documents_folder'
+          if source.key?('allow_code_changes') && (source['type'] != 'code_folder' || ![true, false].include?(source['allow_code_changes']))
+            raise Error, 'Reviewed code changes can be enabled only for Code folder sources.'
+          end
           raise Error, 'Source path must be an absolute server-side folder.' unless source['root'].is_a?(String) && Pathname.new(source['root']).absolute?
           if source['type'] == 'files'
             raise Error, 'File source needs an explicit safe file list (max 500).' unless source['files'].is_a?(Array) && source['files'].size.between?(1, 500) && source['files'].all? { |file| file.is_a?(String) && !Pathname.new(file).absolute? && !file.split(/[\\\/]/).include?('..') }
@@ -100,6 +103,7 @@ module RedmineAi
           source.merge!(old.except('name', 'project_ids', 'revision'))
         else
           source['root'] = row['root'].to_s.strip
+          source['allow_code_changes'] = row['allow_code_changes'] == '1' if source['type'] == 'code_folder'
         end
         source
       end

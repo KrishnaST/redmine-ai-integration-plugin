@@ -1,0 +1,39 @@
+<h2>Code with AI — <%= link_to "##{@issue.id}", issue_path(@issue) %></h2>
+<p>Status: <strong><%= @enhancement.state %></strong>. Changes require review and Apply. No build, test, commit or deployment is performed automatically.</p>
+<% if %w[queued processing].include?(@enhancement.state) %>
+  <% content_for :header_tags do %><meta http-equiv="refresh" content="5"><% end %>
+  <p>Generating a code proposal using the ticket and configured technical sources. This page refreshes automatically.</p>
+<% end %>
+<% if @enhancement.state == 'applying' %><div class="flash warning">Apply is in progress or was interrupted. Do not retry. If it remains in this state, an administrator must review the private code recovery inventory.</div><% end %>
+<% if @document['error'] %><div class="flash error"><%= @document['error'] %></div><% end %>
+<% Array(@document['warnings']).each do |warning| %><div class="flash warning"><%= warning %></div><% end %>
+<% if @document['code_result'] && %w[draft applied].include?(@enhancement.state) %>
+  <% result = @document['code_result'] %>
+  <h3>Proposed implementation</h3>
+  <pre style="white-space:pre-wrap;overflow-wrap:anywhere"><%= result['summary'] %></pre>
+  <% if result['questions'].any? %><h3>Questions</h3><ul><% result['questions'].each do |question| %><li><%= question %></li><% end %></ul><% end %>
+  <% if result['changes'].any? %>
+    <p><%= link_to 'Download proposed patch', download_issue_ai_code_path(@issue, @enhancement) %></p>
+    <% result['changes'].each do |change| %>
+      <% file = @document['code_files'].find { |entry| entry['id'] == change['file_id'] } %>
+      <h3><%= file['source_name'] %>:<%= file['path'] %></h3>
+      <p><%= change['explanation'] %></p>
+      <details open><summary>Diff from captured original</summary>
+        <pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:550px;overflow:auto"><% RedmineAi::CodeDraft.patch({'changes' => [change]}, @document['code_files']).each_line do |line| %><span style="<%= line.start_with?('+') ? 'color:#166534;background:#ecfdf5' : line.start_with?('-') ? 'color:#991b1b;background:#fef2f2' : '' %>"><%= line %></span><% end %></pre>
+      </details>
+    <% end %>
+  <% else %><p>No code changes were proposed. Answer the questions or add identifiers/filenames to the ticket.</p><% end %>
+  <h3>Technical evidence</h3>
+  <ul><% @document['sources'].each do |source| %><li>[<%= source['id'] %>] <%= source['reference'] %></li><% end %></ul>
+<% end %>
+<% if @enhancement.state == 'draft' %>
+  <%= form_tag reply_issue_ai_enhancement_path(@issue, @enhancement) do %>
+    <p><%= label_tag :reply, 'Clarifications or changes to the code proposal' %><br><%= text_area_tag :reply, '', rows: 5, maxlength: 8000, required: true, style: 'width:95%' %></p>
+    <%= submit_tag 'Revise code with AI' %>
+  <% end %>
+  <% if @document.dig('code_result', 'changes')&.any? %>
+    <p>Apply replaces the reviewed existing files in approved server-side code folders and adds a ticket journal entry. Ticket fields remain unchanged. Concurrent file/ticket edits block Apply.</p>
+    <%= button_to 'Apply code changes', apply_issue_ai_enhancement_path(@issue, @enhancement), method: :post, data: {confirm: 'Apply these reviewed changes to the configured code files?'} %>
+  <% end %>
+<% end %>
+<p><%= link_to 'Back to ticket', issue_path(@issue) %></p>

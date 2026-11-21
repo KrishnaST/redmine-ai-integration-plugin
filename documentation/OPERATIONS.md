@@ -1,6 +1,6 @@
 # Operations
 
-Plugin 1.2.0 is deployed to server 215 as of 19 November 2026. Verified stack: Redmine 7.0.2.stable / Ruby 4.0.9 / Rails 8.1.4 / PostgreSQL 18.7. All four source drivers load, the settings/attachment-preview pages render, and native SVG attachment validation passes without saving a file. The existing async backend is unchanged. Enhancement is enabled with a saved API key and zero sources. At the latest inspection the model was gpt-6.2-sol with low reasoning effort. At the user's explicit request, the AI module is enabled in all 34 active projects and the AI permission in all five signed-in roles; Anonymous is excluded and existing issue visibility/edit requirements remain. Review the [deployment record](DEPLOYMENT-2026-11-19.md) and reverify versions before future deployments.
+Plugin 1.3.0 is deployed to server 215 as of 21 November 2026. Verified stack: Redmine 7.0.2.stable / Ruby 4.0.9 / Rails 8.1.4; Redmine's PostgreSQL installation was last verified as 18.7 on 19 November. All four source drivers load, settings/attachment/code pages render, and native SVG validation passes without saving a file. The existing async backend is unchanged. Enhancement is enabled with a saved API key and zero sources. At the latest inspection reasoning effort was low. The existing AI module is enabled in 35 projects and the enhancement permission in five signed-in roles. Code role selection and writable source opt-in are separate and both currently empty. Anonymous is excluded and existing issue visibility/edit requirements remain. Review the [latest rollout](DEPLOYMENT-2026-11-21.md) and reverify versions before future deployments.
 
 ## Endpoints
 
@@ -13,6 +13,7 @@ All paths are relative to Redmine's configured sub-URI (if any):
 | /admin/ai_enhancement/reload_sources | POST | Administrator background source test/reload |
 | /issues/:issue_id/ai_enhancements | POST | Create automatic or interactive enhancement |
 | /issues/:issue_id/ai_enhancements/:id | GET | Owner's private session |
+| /issues/:issue_id/ai_enhancements/:id/code.patch | GET | Owner's draft/applied code patch; selected project role or administrator required |
 | /issues/:issue_id/ai_enhancements/:id/attachments/:index | GET | Owner's draft/applied file download; preview=1 permits inline generated SVG only |
 | /issues/:issue_id/ai_enhancements/:id/reply | POST | Owner's interactive revision |
 | /issues/:issue_id/ai_enhancements/:id/apply | POST | Owner's interactive apply |
@@ -38,6 +39,8 @@ Version 1.1.0 uses structured source forms, a model dropdown and explicit Test/r
 AiSourceCheckJob uses the default queue and does not call OpenAI. It records only statuses/counts, not source contents or sample rows. Changing source settings invalidates old results; token/fingerprint checks plus a settings-row lock prevent late results from replacing newer configuration. A lost async job can leave a queued check; use Test/reload again. Enhancement instructions have been removed from configuration and older saved guidance is ignored.
 
 ## Jobs and retention
+
+Code sessions also use the existing default queue. Code role/source opt-in defaults remain empty/false. In Administration → AI ticket enhancement select the allowed member roles and approved dedicated Code folder checkouts. The plugin never runs a build, test, Git or deploy command. Applying code requires a separate explicit review action. Code session state applying means an in-progress/interrupted filesystem operation; do not expire/retry it automatically. Purge excludes applying sessions. Private encrypted code recovery inventories require the existing Rails secret and are not deleted automatically. See [Code with AI operations](CODE-WITH-AI.md).
 
 Run from Redmine with its production environment loaded:
 

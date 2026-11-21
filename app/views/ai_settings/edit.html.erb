@@ -11,6 +11,11 @@
     <p><%= label_tag 'settings_reasoning_effort', 'Reasoning effort' %><%= select_tag 'settings[reasoning_effort]', options_for_select(RedmineAi::Configuration::REASONING_EFFORT_OPTIONS, @settings['reasoning_effort']) %><br>
       <em>Model default preserves the model's normal behavior. Light / Medium / High / Extra High / Ultra map to low / medium / high / xhigh / max. Supported levels depend on the model; higher levels can increase time and token cost.</em></p>
   </div>
+  <h3>Code with AI access</h3>
+  <p><%= label_tag 'settings_code_role_ids', 'Allowed member roles' %>
+    <%= hidden_field_tag 'settings[code_role_ids][]', '' %>
+    <%= select_tag 'settings[code_role_ids][]', options_for_select(@code_roles || [], @settings['code_role_ids']), multiple: true, size: 5 %></p>
+  <p>Only the selected project roles and administrators can generate/apply code proposals. Existing ticket visibility/edit permissions still apply. Also enable Allow reviewed code changes on each approved Code folder. No role is selected by default.</p>
   <h3>Technical sources</h3>
   <p>Choose server-side code/document folders or database connections. Assign each source to the projects allowed to use its excerpts.</p>
   <%= hidden_field_tag :sources_present, '1' %>

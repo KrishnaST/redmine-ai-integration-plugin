@@ -8,7 +8,7 @@ class AiSettingsController < ApplicationController
 
   def update
     current = RedmineAi::Configuration.values
-    values = params.require(:settings).permit(:enabled, :model, :reasoning_effort).to_h
+    values = params.require(:settings).permit(:enabled, :model, :reasoning_effort, code_role_ids: []).to_h
     RedmineAi::SettingsService.save(values, source_rows: params[:sources_present] == '1' ? source_rows : nil,
       api_key: params[:api_key], clear_api_key: params[:clear_api_key] == '1')
     flash[:notice] = 'AI settings saved.'
@@ -44,6 +44,7 @@ class AiSettingsController < ApplicationController
     @settings = RedmineAi::Configuration.values
     @sources = RedmineAi::Configuration.sources.map { |source| source.merge('id' => RedmineAi::SourceConfiguration.id(source)) }
     @models = RedmineAi::Models.options
+    @code_roles = Role.where(builtin: 0).order(:name).pluck(:name, :id)
     @projects = Project.order(:name).pluck(:name, :id)
     @source_check = @settings['source_check'] || {}
   end
@@ -53,7 +54,7 @@ class AiSettingsController < ApplicationController
     return [] if rows.nil?
     raise RedmineAi::Error, 'Invalid source form.' unless rows.respond_to?(:each_value)
     rows.each_value.map do |row|
-      value = row.permit(:id, :name, :type, :root, :revision, :db_type, :host, :port, :database,
+      value = row.permit(:id, :name, :type, :root, :revision, :allow_code_changes, :db_type, :host, :port, :database,
                         :schema, :username, :password, :clear_password, :include_table_data, project_ids: []).to_h
       tables = row[:sample_tables]
       value['sample_tables'] = tables.respond_to?(:each_value) ? tables.each_value.map { |table| table.permit(:table, :columns, :limit).to_h } : []

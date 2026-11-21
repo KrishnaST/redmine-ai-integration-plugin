@@ -56,7 +56,9 @@ ActiveRecord::Schema.define do
     table.boolean :active, default: true
     table.boolean :permitted, default: true
     table.boolean :attachment_access, default: true
+    table.boolean :administrator, default: true
   end
+  create_table(:roles) { |table| table.string :name; table.integer :builtin, default: 0 }
   create_table(:issues) do |table|
     table.string :subject
     table.text :description
@@ -81,8 +83,10 @@ class User < ApplicationRecord
     attr_accessor :current
   end
   def allowed_to?(*); permitted; end
-  def admin?; permitted; end
+  def admin?; permitted && administrator; end
+  def roles_for_project(*); Role.where(builtin: 0).to_a; end
 end
+class Role < ApplicationRecord; end
 class Issue < ApplicationRecord
   has_many :attachments, as: :container
   validates :subject, exclusion: {in: ['Rejected by validation']}
@@ -98,6 +102,9 @@ class Issue < ApplicationRecord
   def attachments_addable?(user); user.permitted && user.attachment_access; end
 end
 class Attachment < ApplicationRecord
+  class << self
+    attr_accessor :storage_path
+  end
   belongs_to :author, class_name: 'User'
   belongs_to :container, polymorphic: true, optional: true
   validates :filename, presence: true
@@ -116,6 +123,7 @@ ActiveJob::Base.logger = Logger.new(File::NULL)
 
 class PluginTest < Minitest::Test
   def setup
+    Role.delete_all
     Attachment.delete_all
     AiEnhancement.delete_all
     Issue.delete_all

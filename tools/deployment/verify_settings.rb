@@ -22,9 +22,11 @@ ActiveRecord::Base.transaction(requires_new: true) do
     User.current = administrator
     rendered = AiSettingsController.renderer.render(template: 'ai_settings/edit', layout: false,
       assigns: {settings: configuration, sources: [], models: RedmineAi::Models.options,
+                code_roles: Role.where(builtin: 0).order(:name).pluck(:name, :id),
                 projects: Project.order(:name).pluck(:name, :id), source_check: configuration['source_check'] || {}})
     raise 'Model dropdown was not rendered' unless rendered.include?('name="settings[model]"') && rendered.include?('<select')
     raise 'Reasoning effort dropdown was not rendered' unless rendered.include?('name="settings[reasoning_effort]"') && rendered.include?('value="max">Ultra</option>')
+    raise 'Code role/source controls missing' unless rendered.include?('settings[code_role_ids][]') && rendered.include?('Allow reviewed code changes')
     information[:reasoning_effort] = configuration['reasoning_effort'].presence || 'model_default'
     raise 'Structured sources were not rendered' unless rendered.include?('IP / hostname') && rendered.include?('Include table samples') && rendered.include?('Test/reload sources')
     raise 'Obsolete controls still rendered' if rendered.include?('settings[instructions]') || rendered.include?('settings[sources_json]')

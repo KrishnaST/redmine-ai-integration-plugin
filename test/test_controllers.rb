@@ -6,6 +6,7 @@ require 'action_view'
 require 'rack/test'
 require_relative 'test_api_errors'
 require_relative 'test_artifacts'
+require_relative 'test_code_workflow'
 require_relative 'test_database_adapters'
 require_relative 'test_technical_sources'
 class ApplicationController < ActionController::Base
@@ -34,6 +35,7 @@ AiSettingsController.prepend_view_path File.expand_path('../app/views', __dir__)
 
 class ControllerTest < PluginTest
   include ArtifactFixtures
+  include CodeFixtures
   include Rack::Test::Methods
   def app; ROUTES; end
 
@@ -46,6 +48,202 @@ class ControllerTest < PluginTest
       post "/issues/#{@issue.id}/ai_enhancements", {mode: 'interactive'}
       assert_equal 302, last_response.status
       assert_equal 'interactive', AiEnhancement.last.mode
+    end
+  end
+
+  def test_code_button_and_route_require_selected_project_role
+    role = Role.create!(name: 'Developer')
+    @user.update!(administrator: false)
+    post "/issues/#{@issue.id}/ai_enhancements", {mode: 'code'}
+    assert_equal 403, last_response.status
+    Setting.plugin_redmine_ai_integration['code_role_ids'] = [role.id]
+    AiEnhancementJob.stub(:perform_later, true) do
+      post "/issues/#{@issue.id}/ai_enhancements", {mode: 'code'}
+      assert_equal 302, last_response.status
+      assert_equal 'code', AiEnhancement.last.mode
+    end
+    get '/admin/ai_enhancement'
+    assert_includes last_response.body, 'Code with AI access'
+    assert_includes last_response.body, 'Developer'
+    assert_equal 0, Attachment.count
+  end
+
+  def test_code_generation_uses_ticket_and_real_files_without_writing
+    with_code_workspace do
+      record = code_record
+      record.update!(state: 'queued')
+      expected = record.data['code_result']
+      RedmineAi::CodeDraft.stub(:generate, ->(fields:, evidence:, messages:, files:) { assert_equal @issue.subject, fields['subject']; assert_equal @original_code, files.first['content']; expected }) do
+        AiEnhancementJob.perform_now(record.id)
+      end
+      assert_equal 'draft', record.reload.state
+      assert_equal @original_code, File.read(File.join(@code_root, 'payment.rb'))
+      assert_equal 'payment error', @issue.reload.subject
+      get "/issues/#{@issue.id}/ai_enhancements/#{record.id}"
+      assert_includes last_response.body, 'Apply code changes'
+      assert_includes last_response.body, 'Download proposed patch'
+      get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/code.patch"
+      assert_equal 200, last_response.status
+      assert_includes last_response.body, '+    true'
+      User.current = User.create!
+      assert_raises(ActiveRecord::RecordNotFound) { get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/code.patch" }
+    end
+  end
+
+  def test_code_apply_writes_files_once_and_preserves_ticket_fields
+    with_code_workspace do
+      record = code_record
+      RedmineAi::CodeApplyService.apply!(record)
+      assert_equal 'applied', record.reload.state
+      assert_equal @original_code.sub('false', 'true'), File.read(File.join(@code_root, 'payment.rb'))
+      assert_equal 'payment error', @issue.reload.subject
+      assert_equal 'Transfer fails after confirmation', @issue.description
+      assert_equal 0, Attachment.count
+      recovery = Dir.glob(File.join(Attachment.storage_path, 'ai-code-recovery', '*.encrypted')).first
+      refute_includes File.read(recovery), 'class Payment'
+      original = RedmineAi::Configuration.encryptor.decrypt_and_verify(File.read(recovery))
+      assert_equal @original_code, original['files'].first['before']
+      assert_raises(RedmineAi::Error) { RedmineAi::CodeApplyService.apply!(record) }
+    end
+  end
+
+  def test_code_apply_blocks_changed_files_and_revoked_source
+    with_code_workspace do
+      record = code_record
+      File.write(File.join(@code_root, 'payment.rb'), '# changed outside Redmine')
+      assert_raises(RedmineAi::Error) { RedmineAi::CodeApplyService.apply!(record) }
+      assert_equal '# changed outside Redmine', File.read(File.join(@code_root, 'payment.rb'))
+      assert_equal 'failed', record.reload.state
+      File.write(File.join(@code_root, 'payment.rb'), @original_code)
+      record = code_record
+      Setting.plugin_redmine_ai_integration['sources_json'] = '[]'
+      assert_raises(RedmineAi::Error) { RedmineAi::CodeApplyService.apply!(record) }
+      assert_equal @original_code, File.read(File.join(@code_root, 'payment.rb'))
+    end
+  end
+
+  def test_code_apply_rolls_back_files_if_journal_commit_fails
+    with_code_workspace do
+      record = code_record
+      callback = -> { raise IOError, 'synthetic persistence failure' }
+      Issue.set_callback(:save, :before, callback)
+      begin
+        assert_raises(RedmineAi::Error) { RedmineAi::CodeApplyService.apply!(record) }
+      ensure
+        Issue.skip_callback(:save, :before, callback)
+      end
+      assert_equal @original_code, File.read(File.join(@code_root, 'payment.rb'))
+      assert_equal 'failed', record.reload.state
+    end
+  end
+
+  def test_code_apply_rechecks_permissions_and_ticket_baseline
+    with_code_workspace do
+      record = code_record
+      @issue.update!(subject: 'Edited elsewhere')
+      assert_raises(RedmineAi::Error) { RedmineAi::CodeApplyService.apply!(record) }
+      assert_equal @original_code, File.read(File.join(@code_root, 'payment.rb'))
+      @user.update!(permitted: false)
+      post "/issues/#{@issue.id}/ai_enhancements/#{record.id}/apply"
+      assert_equal 403, last_response.status
+    end
+  end
+
+  def test_code_apply_restores_first_file_if_a_later_write_fails
+    with_code_workspace do
+      File.binwrite(File.join(@code_root, 'second.rb'), "class PaymentTwo; end\n")
+      record = code_record
+      document = record.data
+      second = document['code_files'].find { |file| file['path'] == 'second.rb' }
+      document['code_result']['changes'] << {'file_id' => second['id'], 'explanation' => 'Second proposed change', 'content' => "class PaymentTwo; def valid?; true; end; end\n"}
+      record.data = document
+      record.save!
+      replace = RedmineAi::CodeApplyService.method(:replace!)
+      RedmineAi::CodeApplyService.stub(:replace!, ->(target, content, expected:) { raise IOError, 'synthetic second-write failure' if target[:relative] == 'second.rb'; replace.call(target, content, expected: expected) }) do
+        assert_raises(RedmineAi::Error) { RedmineAi::CodeApplyService.apply!(record) }
+      end
+      assert_equal @original_code, File.binread(File.join(@code_root, 'payment.rb'))
+      assert_equal "class PaymentTwo; end\n", File.binread(File.join(@code_root, 'second.rb'))
+      assert_equal 'failed', record.reload.state
+    end
+  end
+
+  def test_code_worker_rechecks_role_permission_before_calling_api
+    with_code_workspace do
+      record = code_record
+      record.update!(state: 'queued')
+      @user.update!(administrator: false)
+      RedmineAi::CodeDraft.stub(:generate, ->(**) { flunk 'Revoked role must not make an API request' }) { AiEnhancementJob.perform_now(record.id) }
+      assert_equal 'failed', record.reload.state
+      assert_equal @original_code, File.binread(File.join(@code_root, 'payment.rb'))
+    end
+  end
+
+  def test_code_http_contract_and_revision_are_separate_from_ticket_enhancement
+    with_code_workspace do
+      record = code_record
+      document = record.data
+      body = {'status' => 'completed', 'output' => [{'content' => [{'type' => 'output_text', 'text' => JSON.generate(document['code_result'])}]}]}
+      with_api(body) do
+        assert_equal document['code_result'], RedmineAi::CodeDraft.generate(fields: {'subject' => @issue.subject}, evidence: [], messages: [], files: document['code_files'])
+      end
+      AiEnhancementJob.stub(:perform_later, true) do
+        post "/issues/#{@issue.id}/ai_enhancements/#{record.id}/reply", {reply: 'Keep the change small'}
+        assert_equal 302, last_response.status
+        assert_equal 'queued', record.reload.state
+        assert_equal 'Keep the change small', record.data['messages'].last['text']
+      end
+      assert_equal @original_code, File.binread(File.join(@code_root, 'payment.rb'))
+      assert_equal 'payment error', @issue.reload.subject
+    end
+  end
+
+  def test_code_download_and_apply_recheck_session_owner_and_selected_role
+    with_code_workspace do
+      record = code_record
+      User.current = User.create!
+      assert_raises(ActiveRecord::RecordNotFound) { get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/code.patch" }
+      User.current = @user
+      @user.update!(administrator: false)
+      get "/issues/#{@issue.id}/ai_enhancements/#{record.id}/code.patch"
+      assert_equal 403, last_response.status
+      post "/issues/#{@issue.id}/ai_enhancements/#{record.id}/apply"
+      assert_equal 403, last_response.status
+      assert_equal @original_code, File.binread(File.join(@code_root, 'payment.rb'))
+    end
+  end
+
+  def test_code_roles_are_saved_and_can_be_cleared_without_affecting_other_settings
+    role = Role.create!(name: 'Developer')
+    post '/admin/ai_enhancement', {settings: {model: 'test-model', code_role_ids: ['', role.id.to_s]}}
+    assert_equal 302, last_response.status
+    assert_equal [role.id], RedmineAi::Configuration.values['code_role_ids']
+    post '/admin/ai_enhancement', {settings: {model: 'test-model', code_role_ids: ['']}}
+    assert_equal 302, last_response.status
+    assert_equal [], RedmineAi::Configuration.values['code_role_ids']
+    assert_equal '1', RedmineAi::Configuration.values['enabled']
+  end
+
+  def test_code_apply_keeps_recovery_state_when_an_external_edit_blocks_rollback
+    with_code_workspace do
+      record = code_record
+      target_path = File.join(@code_root, 'payment.rb')
+      callback = -> { File.binwrite(target_path, '# external edit'); raise IOError, 'synthetic conflict' }
+      Issue.set_callback(:save, :before, callback)
+      begin
+        error = assert_raises(RedmineAi::Error) { RedmineAi::CodeApplyService.apply!(record) }
+        assert_includes error.message, 'operator recovery'
+      ensure
+        Issue.skip_callback(:save, :before, callback)
+      end
+      assert_equal 'applying', record.reload.state
+      assert_equal '# external edit', File.binread(File.join(@code_root, 'payment.rb'))
+      assert Dir.glob(File.join(Attachment.storage_path, 'ai-code-recovery', '*.encrypted')).any?
+      AiEnhancementJob.stub(:perform_later, ->(*) { flunk 'Interrupted apply must block new sessions' }) do
+        post "/issues/#{@issue.id}/ai_enhancements", {mode: 'code'}
+        assert_equal 302, last_response.status
+        assert_equal 1, AiEnhancement.where(issue_id: @issue.id).count
+      end
     end
   end
 

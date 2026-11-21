@@ -5,7 +5,7 @@ require_relative 'source_configuration'
 module RedmineAi
   class Error < StandardError; end
   class Configuration
-    DEFAULTS = {'enabled' => '0', 'model' => 'gpt-6.2-astra', 'reasoning_effort' => '', 'sources_json' => '[]'}.freeze
+    DEFAULTS = {'enabled' => '0', 'model' => 'gpt-6.2-astra', 'reasoning_effort' => '', 'sources_json' => '[]', 'code_role_ids' => []}.freeze
     REASONING_EFFORT_OPTIONS = [['Model default', ''], ['Light', 'low'], ['Medium', 'medium'],
                               ['High', 'high'], ['Extra High', 'xhigh'], ['Ultra', 'max']].map(&:freeze).freeze
 

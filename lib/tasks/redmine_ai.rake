@@ -16,6 +16,6 @@ namespace :redmine_ai do
 
   desc 'Delete completed/non-running enhancement sessions older than 30 days; keep issue journals'
   task purge: :environment do
-    AiEnhancement.where.not(state: %w[queued processing]).where('updated_at < ?', 30.days.ago).delete_all
+    AiEnhancement.where.not(state: %w[queued processing applying]).where('updated_at < ?', 30.days.ago).delete_all
   end
 end
